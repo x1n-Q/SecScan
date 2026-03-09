@@ -68,4 +68,25 @@ Never commit:
 - scan targets that are confidential
 - raw reports containing customer secrets
 
+### Gitleaks Scanner Safety
+
+This repository includes Gitleaks, a secrets scanner that detects accidentally committed credentials.
+
+**How it protects you:**
+- Scans your repository history for exposed secrets
+- Masks secrets in all output (never shows full values)
+- Automatically cleans report files after scanning
+- Warns you with location and secret type
+
+**If Gitleaks finds secrets:**
+1. Stop immediately - do not push/share the code
+2. Rotate the exposed credential in all systems
+3. Use `git-filter-repo` to remove from history
+4. Force-push the cleaned history to your repository
+5. Notify team members who may have pulled the code
+
 If a secret is accidentally committed, rotate it immediately and remove it from follow-up history where possible.
+
+### Further Reading
+- [NIST Guidelines on Credential Management](https://pages.nist.gov/800-63-3/)
+- [Gitleaks Documentation](https://github.com/gitleaks/gitleaks)

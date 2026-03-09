@@ -74,3 +74,18 @@ The safer pattern is to keep the remote URL clean and provide credentials only f
 If you keep this repo framed as an authorized defensive scanner, it is much safer.
 
 If you market or modify it as a tool for unauthorized recon, scanning, or exploitation, that is where the real risk of account, platform, school, or employer trouble starts.
+
+## Secret Scanning (Gitleaks)
+
+**Good news:** Gitleaks is a defensive scanner that helps you **prevent** secret leaks, not create them.
+
+**Why it's safe:**
+- Scans your own code, not external targets
+- Results are masked (secrets replaced with `****`)
+- Helps you find and fix problems before publishing
+- No risk of unauthorized access
+
+**Why include it:**
+- Shows you're security-conscious
+- Demonstrates you're protecting credentials
+- Reduces platform risk by catching secrets early

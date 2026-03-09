@@ -101,4 +101,11 @@ class GitleaksTool(ToolBase):
                 )
             )
 
+        # After processing findings, ensure report file is deleted for maximum security
+        try:
+            if os.path.isfile(report_file):
+                os.remove(report_file)
+        except Exception:
+            pass
+
         return findings

@@ -37,13 +37,24 @@ Do not use SecScan against systems, applications, APIs, domains, or networks you
 
 - `Semgrep`
 - `Bandit`
-- `Gitleaks`
+- `Gitleaks` ⚠️ (detects & masks hardcoded secrets; see `SCANNING_SAFELY.md`)
 - `Trivy`
 - `Checkov`
 - `Kube-bench`
 - `Lynis`
 
 ### Web, recon, and network
+
+## Secret Scanning Safety
+
+**Gitleaks** scans repositories for accidentally committed secrets (API keys, tokens, passwords). If secrets are found:
+
+1. **They are masked in all reports** (first 4 chars + `****`)
+2. **Rotate the credential immediately** in all systems
+3. **Remove from history** using `git-filter-repo`
+4. **Force-push** the cleaned history
+
+See `SCANNING_SAFELY.md` for detailed remediation steps.
 
 - `Security Headers`
 - `TLS Certificate Check`

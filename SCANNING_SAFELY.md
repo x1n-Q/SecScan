@@ -36,6 +36,43 @@ Active scanners are throttled with brief delays between runs to reduce accidenta
 
 This is only a safeguard. It does not make unauthorized scanning acceptable.
 
+## Gitleaks - Secrets Scanning
+
+Gitleaks scans your repository for accidentally committed secrets (API keys, tokens, passwords, etc.).
+
+### Important Safety Notes:
+
+1. **Gitleaks scans your own code** - not external targets
+2. **Raw reports are automatically masked** - secrets are replaced with `****` before saving
+3. **Secrets are never printed in full** - only the first 4 characters + mask are shown
+4. **If secrets are found:**
+   - Rotate the credential immediately
+   - Remove from source code
+   - Rewrite git history with `git-filter-repo`
+   - Notify team members
+
+### How to Fix Exposed Secrets:
+
+```bash
+# 1. Install git-filter-repo
+pip install git-filter-repo
+
+# 2. Remove secret from history
+git filter-repo --invert-paths --path <file-with-secret>
+
+# 3. Force push (WARNING: affects all contributors)
+git push origin --force-with-lease
+
+# 4. Rotate the credential everywhere
+# Change API key, password, token in all systems
+```
+
+References:
+- [GitHub: Removing sensitive data](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
+- [Gitleaks Documentation](https://github.com/gitleaks/gitleaks)
+
+---
+
 ## Audit Trail
 
 Each scan writes a `scan_audit.log` file under the scan output directory with:
