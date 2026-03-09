@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) SecScan Contributors
+# See LICENSE and SECURITY.md for usage terms
 """Helpers for importing GitHub repositories for scanning."""
 
 from __future__ import annotations
@@ -24,30 +27,34 @@ def clone_or_update_github_repo(
         raise RuntimeError("Git is not installed or not found in PATH.")
 
     clean_url = (repo_url or "").strip()
-    if not clean_url:
-        raise RuntimeError("Repository URL is required.")
+    auth_token = (token or "").strip()
+    try:
+        if not clean_url:
+            raise RuntimeError("Repository URL is required.")
 
-    clean_url = _normalize_repo_url(clean_url)
-    repo_name = _repo_name_from_url(clean_url)
-    os.makedirs(dest_root, exist_ok=True)
-    dest_path = os.path.join(dest_root, repo_name)
+        clean_url = _normalize_repo_url(clean_url)
+        repo_name = _repo_name_from_url(clean_url)
+        os.makedirs(dest_root, exist_ok=True)
+        dest_path = os.path.join(dest_root, repo_name)
 
-    if os.path.isdir(os.path.join(dest_path, ".git")):
-        _set_origin_url(dest_path, clean_url)
-        _run(["git", "-C", dest_path, "fetch", "--all", "--prune"], token, clean_url)
+        if os.path.isdir(os.path.join(dest_path, ".git")):
+            _set_origin_url(dest_path, clean_url)
+            _run(["git", "-C", dest_path, "fetch", "--all", "--prune"], auth_token, clean_url)
+            if branch:
+                _run(["git", "-C", dest_path, "checkout", branch], auth_token, clean_url)
+                _run(["git", "-C", dest_path, "pull", "origin", branch], auth_token, clean_url)
+            else:
+                _run(["git", "-C", dest_path, "pull", "--ff-only"], auth_token, clean_url)
+            return dest_path, "Repository updated."
+
+        clone_cmd = ["git", "clone", clean_url, dest_path]
         if branch:
-            _run(["git", "-C", dest_path, "checkout", branch], token, clean_url)
-            _run(["git", "-C", dest_path, "pull", "origin", branch], token, clean_url)
-        else:
-            _run(["git", "-C", dest_path, "pull", "--ff-only"], token, clean_url)
-        return dest_path, "Repository updated."
-
-    clone_cmd = ["git", "clone", clean_url, dest_path]
-    if branch:
-        clone_cmd = ["git", "clone", "--branch", branch, "--single-branch", clean_url, dest_path]
-    _run(clone_cmd, token, clean_url)
-    _set_origin_url(dest_path, clean_url)
-    return dest_path, "Repository cloned."
+            clone_cmd = ["git", "clone", "--branch", branch, "--single-branch", clean_url, dest_path]
+        _run(clone_cmd, auth_token, clean_url)
+        _set_origin_url(dest_path, clean_url)
+        return dest_path, "Repository cloned."
+    finally:
+        auth_token = ""
 
 
 def _run(args: list[str], token: str, repo_url: str = "") -> None:

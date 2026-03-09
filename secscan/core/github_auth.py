@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) SecScan Contributors
+# See LICENSE and SECURITY.md for usage terms
 """GitHub OAuth Device Flow helpers for desktop login."""
 
 from __future__ import annotations
@@ -131,35 +134,22 @@ def fetch_github_username(token: str) -> str:
 
 
 def save_access_token(token: str) -> None:
-    """Store access token in keyring if available, else local file."""
+    """Store access token in keyring if available."""
     tok = (token or "").strip()
     if not tok:
         return
 
-    if _try_keyring_set(tok):
-        return
-
-    data = _load_config()
-    data["access_token"] = tok
-    _save_config(data)
+    _try_keyring_set(tok)
 
 
 def load_access_token() -> str:
     """Load saved access token."""
-    token = _try_keyring_get()
-    if token:
-        return token
-    data = _load_config()
-    return str(data.get("access_token", "")).strip()
+    return _try_keyring_get()
 
 
 def clear_access_token() -> None:
     """Delete saved access token."""
     _try_keyring_delete()
-    data = _load_config()
-    if "access_token" in data:
-        del data["access_token"]
-        _save_config(data)
 
 
 def _extract_error(resp: requests.Response) -> str:

@@ -3,6 +3,11 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.env
+.env.local
+.env.*.local
+/config.ini
+/settings.json
 
 .secscan-history/
 secscan-results/

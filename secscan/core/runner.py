@@ -1,15 +1,25 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) SecScan Contributors
+# See LICENSE and SECURITY.md for usage terms
 """Scan engine - orchestrates tool execution in background threads."""
 
 from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from PySide6.QtCore import QObject, QThread, Signal
 
 from secscan.core.detect import ProjectInfo
+from secscan.core.safety import (
+    ACTIVE_SCAN_DELAY_SECONDS,
+    audit_scan_targets,
+    normalize_target_url,
+    should_throttle,
+)
 from secscan.core.schema import ScanResult
 from secscan.tools.base import ToolBase
 
@@ -57,7 +67,28 @@ class ScanWorker(QObject):
         os.makedirs(raw_dir, exist_ok=True)
         self.log.emit(f"[project] {self._project_info.path}")
         if self._project_info.website_url:
-            self.log.emit(f"[url] {self._project_info.website_url}")
+            try:
+                assessment = normalize_target_url(self._project_info.website_url)
+                self._project_info.website_url = assessment.normalized_url
+                self.log.emit(f"[url] {assessment.normalized_url}")
+                if assessment.warning:
+                    self.log.emit(f"[warn] {assessment.warning}")
+            except ValueError as exc:
+                msg = f"[error] Invalid target URL: {exc}"
+                self.log.emit(msg)
+                result.errors.append(msg)
+                result.finished_at = datetime.now(timezone.utc).isoformat()
+                self.progress.emit(100)
+                self.finished.emit(result)
+                return
+        audit_path = audit_scan_targets(
+            self._output_dir,
+            self._project_info.path,
+            self._project_info.website_url,
+            self._tools,
+            source="gui",
+        )
+        self.log.emit(f"[audit] Targets logged to {audit_path}")
         if self._verbose_logs:
             self.log.emit("[full-log] enabled: showing command output and raw tool logs")
 
@@ -91,6 +122,11 @@ class ScanWorker(QObject):
 
             if self._verbose_logs and not self._stopped:
                 self._emit_new_raw_logs(raw_dir, before_raw, tool.name)
+            if idx < total - 1 and should_throttle(tool.name, self._project_info.website_url):
+                self.log.emit(
+                    f"[rate-limit] Sleeping {ACTIVE_SCAN_DELAY_SECONDS:.1f}s before the next active scanner."
+                )
+                time.sleep(ACTIVE_SCAN_DELAY_SECONDS)
 
         if self._enable_ignore and not self._stopped:
             self._apply_ignore_list(result)

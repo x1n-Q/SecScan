@@ -68,6 +68,22 @@ Some scanners in this repo perform active probing or reconnaissance. These are t
 
 If you are publishing or forking this project, make the authorized-use warning visible and avoid marketing it for abuse, bypass, exploitation, credential theft, or stealth.
 
+## Platform Policy Compliance
+
+This project includes active security scanners. GitHub and other platforms prohibit using any tool for unauthorized access attempts or abusive scanning.
+
+**Allowed:**
+- scanning systems you own
+- authorized penetration testing with written permission
+- lab or classroom environments with permission
+
+**Prohibited:**
+- scanning third-party infrastructure without authorization
+- using the tool for credential theft, exfiltration, disruption, or stealth
+- bypassing authentication or access controls without approval
+
+See `SCANNING_SAFELY.md` and `DANGEROUS_SCANNERS.md` before enabling active scanners.
+
 ## Quick Start
 
 ### 1. Clone the repository
@@ -133,6 +149,8 @@ Typical GUI flow:
 
 For GitHub imports, personal access tokens are intended only for the active clone or pull operation and should not be committed, shared, or stored in repository remotes.
 
+Active scanners such as `Sqlmap`, `Nmap`, `OWASP ZAP`, `Nikto`, `Dirb`, `XssPy`, and `Amass` require explicit manual opt-in in the GUI and an extra confirmation before they run.
+
 ### CLI
 
 List available tools:
@@ -150,13 +168,13 @@ python -m secscan.cli scan --repo ./my-project --profile "Recommended Scan" --fo
 Run a web-focused scan:
 
 ```bash
-python -m secscan.cli scan --repo ./my-project --url https://example.com --profile "Web Scan" --format json
+python -m secscan.cli scan --repo ./my-project --url https://example.com --profile "Web Scan" --allow-active-scans --format json
 ```
 
 Run the full profile:
 
 ```bash
-python -m secscan.cli scan --repo ./my-project --url https://example.com --profile "Full Scan" --format both
+python -m secscan.cli scan --repo ./my-project --url https://example.com --profile "Full Scan" --allow-active-scans --format both
 ```
 
 ## Scan Profiles
@@ -227,6 +245,11 @@ See `SECURITY.md` for:
 - supported versions
 - safe testing rules
 - prohibited contribution categories
+
+## Safe Scanning Guides
+
+- `SCANNING_SAFELY.md` - target authorization, validation, and handling guidance
+- `DANGEROUS_SCANNERS.md` - scanners that require explicit authorization and when to avoid them
 
 ## Repository Risk Review
 

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) SecScan Contributors
+# See LICENSE and SECURITY.md for usage terms
 """Project selection page with local folder + GitHub import."""
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from secscan.core.detect import ProjectInfo, detect_project
 from secscan.core.github_repo import clone_or_update_github_repo
+from secscan.core.safety import normalize_target_url
 
 
 _CARD_STYLE = (
@@ -95,6 +99,7 @@ class _CloneWorker(QObject):
         except Exception as exc:
             self.error.emit(str(exc))
         finally:
+            self._token = ""
             self.finished.emit()
 
 
@@ -341,6 +346,7 @@ class ProjectPage(QWidget):
         self._clone_thread.start()
 
     def _on_clone_success(self, local_path: str, action: str):
+        self._repo_token_edit.clear()
         self._folder_edit.setText(local_path)
         self._detect(local_path)
         self._import_status.setText(f"✅ {action} Ready to scan: {local_path}")
@@ -350,6 +356,7 @@ class ProjectPage(QWidget):
         )
 
     def _on_clone_error(self, message: str):
+        self._repo_token_edit.clear()
         self._import_status.setText(f"❌ Import failed.")
         self._import_status.setStyleSheet(
             "color: #c62828; font-size: 11px; font-weight: bold; "
@@ -379,7 +386,17 @@ class ProjectPage(QWidget):
 
     def _on_continue(self):
         if self._project_info:
-            self._project_info.website_url = self._url_edit.text().strip()
+            website_url = self._url_edit.text().strip()
+            if website_url:
+                try:
+                    assessment = normalize_target_url(website_url)
+                except ValueError as exc:
+                    self._show_message("Invalid Target URL", str(exc), icon=QMessageBox.Icon.Warning)
+                    return
+                self._project_info.website_url = assessment.normalized_url
+                self._url_edit.setText(assessment.normalized_url)
+            else:
+                self._project_info.website_url = ""
             self.project_selected.emit(self._project_info)
 
     def _show_message(self, title: str, text: str, icon: QMessageBox.Icon = QMessageBox.Icon.Warning):

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) SecScan Contributors
+# See LICENSE and SECURITY.md for usage terms
 """Tools page: list scanners, status, and tool installation controls."""
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from PySide6.QtWidgets import (
 from secscan.core.detect import ProjectInfo
 from secscan.core.installer import InstallManager
 from secscan.core.profiles import PROFILES, ProfileName
+from secscan.core.safety import DANGEROUS_TOOL_NAMES, dangerous_tools_selected, normalize_target_url
 from secscan.tools import ALL_TOOLS
 from secscan.tools.base import ToolBase
 
@@ -69,6 +73,8 @@ class _ToolCard(QFrame):
         info_layout.addWidget(name_lbl)
 
         desc_lbl = QLabel(tool.description)
+        if tool.name in DANGEROUS_TOOL_NAMES:
+            desc_lbl.setText(f"{tool.description}\nAuthorization required. Use only on approved targets.")
         desc_lbl.setStyleSheet("color: #616161; font-size: 11px;")
         desc_lbl.setWordWrap(True)
         info_layout.addWidget(desc_lbl)
@@ -167,7 +173,7 @@ class ToolsPage(QWidget):
         root.addWidget(header)
 
         subtitle = QLabel(
-            "Enable scanners to run. Missing tools can be installed from this page."
+            "Enable scanners to run. Active web and network scanners require explicit authorization."
         )
         subtitle.setWordWrap(True)
         subtitle.setStyleSheet("color: #555; font-size: 13px;")
@@ -314,9 +320,13 @@ class ToolsPage(QWidget):
 
     def _select_all_installed(self):
         for card in self._cards:
-            if card._applicable and card.tool.is_installed():
+            if card._applicable and card.tool.is_installed() and card.tool.name not in DANGEROUS_TOOL_NAMES:
                 card.checkbox.setChecked(True)
         self._set_mode_combo("custom")
+        self._set_status(
+            "Selected all installed non-dangerous tools. Active scanners must be enabled manually.",
+            tone="info",
+        )
 
     def _deselect_all(self):
         for card in self._cards:
@@ -483,12 +493,23 @@ class ToolsPage(QWidget):
         self._updating_mode = True
         try:
             for card in self._cards:
-                should_check = card._applicable and card.tool.name in profile.tool_names
+                should_check = (
+                    card._applicable
+                    and card.tool.name in profile.tool_names
+                    and card.tool.name not in DANGEROUS_TOOL_NAMES
+                )
                 card.checkbox.setChecked(should_check)
         finally:
             self._updating_mode = False
 
-        self._set_status(f"{profile.name.value} selected.", tone="info")
+        contains_dangerous = any(name in DANGEROUS_TOOL_NAMES for name in profile.tool_names)
+        if contains_dangerous:
+            self._set_status(
+                f"{profile.name.value} selected. Active scanners remain unchecked until you opt in manually.",
+                tone="warn",
+            )
+        else:
+            self._set_status(f"{profile.name.value} selected.", tone="info")
         self._update_install_button_state()
 
     def _restore_manual_selection(self, checked_by_name: dict[str, bool]):
@@ -587,4 +608,32 @@ class ToolsPage(QWidget):
                 QMessageBox.Icon.Warning,
             )
             return
+        if self._project_info and self._project_info.website_url:
+            try:
+                assessment = normalize_target_url(self._project_info.website_url)
+            except ValueError as exc:
+                self._show_message("Invalid Target URL", str(exc), QMessageBox.Icon.Warning)
+                return
+            self._project_info.website_url = assessment.normalized_url
+            dangerous = dangerous_tools_selected(tools)
+            if dangerous:
+                lines = [
+                    "The selected scan includes active scanners that require explicit authorization.",
+                    "",
+                    f"Target: {assessment.normalized_url}",
+                ]
+                if assessment.warning:
+                    lines.extend(["", assessment.warning])
+                lines.extend(
+                    [
+                        "",
+                        "Dangerous scanners:",
+                        *[f"- {name}" for name in dangerous],
+                        "",
+                        "Continue only if you own the target or have written permission to test it.",
+                    ]
+                )
+                answer = self._ask_yes_no("Authorization Required", "\n".join(lines))
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
         self.tools_confirmed.emit(tools)

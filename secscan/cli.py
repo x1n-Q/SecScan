@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from typing import List
 
@@ -25,6 +26,14 @@ from secscan.core.profiles import (
 )
 from secscan.core.report_html import export_html
 from secscan.core.report_json import export_json
+from secscan.core.safety import (
+    ACTIVE_SCAN_DELAY_SECONDS,
+    DANGEROUS_TOOL_NAMES,
+    audit_scan_targets,
+    dangerous_tools_selected,
+    normalize_target_url,
+    should_throttle,
+)
 from secscan.core.schema import Finding, ScanResult
 from secscan.core.security_score import calculate_score
 from secscan.tools import ALL_TOOLS
@@ -88,6 +97,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not apply .secscan-ignore suppression rules",
     )
+    scan_cmd.add_argument(
+        "--allow-active-scans",
+        action="store_true",
+        help="Explicitly allow active web, network, and recon scanners against the provided target URL",
+    )
 
     # ---- list-tools command ----
     sub.add_parser("list-tools", help="List all available scanner tools")
@@ -101,6 +115,18 @@ def _run_scan(args: argparse.Namespace) -> int:
     if not os.path.isdir(repo_path):
         print(f"Error: '{repo_path}' is not a valid directory.", file=sys.stderr)
         return 1
+
+    normalized_target = ""
+    target_warning = ""
+    if args.url:
+        try:
+            assessment = normalize_target_url(args.url)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        normalized_target = assessment.normalized_url
+        target_warning = assessment.warning
+        args.url = normalized_target
 
     # Detect project
     print(f"Detecting project type in {repo_path}...")
@@ -126,6 +152,14 @@ def _run_scan(args: argparse.Namespace) -> int:
         ]
     tools = filter_tools_by_profile(applicable, profile)
 
+    dangerous = dangerous_tools_selected(tools)
+    if dangerous and not args.allow_active_scans:
+        print("Active scanners were selected for a web target.", file=sys.stderr)
+        print("These scanners require explicit authorization and the --allow-active-scans flag:", file=sys.stderr)
+        for name in dangerous:
+            print(f"  - {name}", file=sys.stderr)
+        return 1
+
     if not tools:
         print("No applicable and installed tools found for this profile.", file=sys.stderr)
         print("Installed tools:")
@@ -137,11 +171,17 @@ def _run_scan(args: argparse.Namespace) -> int:
     print(f"\nRunning {len(tools)} scanner(s):")
     for t in tools:
         print(f"  - {t.name}")
+    if normalized_target:
+        print(f"\nTarget URL: {normalized_target}")
+        if target_warning:
+            print(f"[warn] {target_warning}")
 
     # Prepare output
     output_dir = args.output or os.path.join(repo_path, "secscan-results")
     raw_dir = os.path.join(output_dir, "raw")
     os.makedirs(raw_dir, exist_ok=True)
+    audit_path = audit_scan_targets(output_dir, repo_path, normalized_target, tools, source="cli")
+    print(f"[audit] Targets logged to {audit_path}")
 
     # Run scans
     result = ScanResult(
@@ -150,7 +190,7 @@ def _run_scan(args: argparse.Namespace) -> int:
         started_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    for tool in tools:
+    for idx, tool in enumerate(tools):
         print(f"\n[>] Running {tool.name}...")
         try:
             findings = tool.run(
@@ -164,6 +204,9 @@ def _run_scan(args: argparse.Namespace) -> int:
             msg = f"[ERROR] {tool.name} failed: {exc}"
             print(msg, file=sys.stderr)
             result.errors.append(msg)
+        if idx < len(tools) - 1 and should_throttle(tool.name, normalized_target):
+            print(f"[rate-limit] Sleeping {ACTIVE_SCAN_DELAY_SECONDS:.1f}s before the next active scanner...")
+            time.sleep(ACTIVE_SCAN_DELAY_SECONDS)
 
     result.finished_at = datetime.now(timezone.utc).isoformat()
 
@@ -238,7 +281,8 @@ def _list_tools() -> int:
     for tool in ALL_TOOLS:
         installed = "Installed" if tool.is_installed() else "Missing"
         print(f"  {tool.name:25s}  {installed}")
-        print(f"    {tool.description}")
+        note = " [authorization required]" if tool.name in DANGEROUS_TOOL_NAMES else ""
+        print(f"    {tool.description}{note}")
         if not tool.is_installed():
             print(f"    Install: {tool.install_instructions().splitlines()[0]}")
         print()
