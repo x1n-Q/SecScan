@@ -1,0 +1,1 @@
+"""SecScan GUI package."""

@@ -1,0 +1,17 @@
+# SecScan ignore file
+# Add vulnerability IDs or rule IDs to suppress known findings.
+# One pattern per line. Use # for comments.
+#
+# Examples:
+#   CVE-2023-12345
+#   semgrep.rule.id
+#   GHSA-xxxx-yyyy-zzzz  # reason: accepted risk
+
+# Suppress a specific CVE (accepted risk after review)
+# CVE-2023-12345  # reason: not exploitable in our context
+
+# Suppress a semgrep rule
+# javascript.lang.security.audit.detect-non-literal-regexp  # reason: false positive
+
+# Suppress a GHSA advisory
+# GHSA-abcd-efgh-ijkl  # reason: mitigated by WAF

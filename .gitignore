@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.secscan-history/
+secscan-results/
+raw/
+findings.json
+
+.secscan/
+*.log
