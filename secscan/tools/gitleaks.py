@@ -47,7 +47,7 @@ class GitleaksTool(ToolBase):
             timeout=300,
         )
 
-        self._save_raw(raw_dir, "gitleaks_log.txt", (proc.stdout or "") + (proc.stderr or ""))
+        self._save_raw(raw_dir, "gitleaks_log.txt", "Raw output omitted for security reasons (preventing secret exposure).")
 
         findings: List[Finding] = []
 
@@ -58,6 +58,19 @@ class GitleaksTool(ToolBase):
         try:
             with open(report_file, "r", encoding="utf-8") as fh:
                 leaks = json.load(fh)
+            
+            # Secure the stored report by masking secrets
+            if isinstance(leaks, list):
+                for leak in leaks:
+                    if "Match" in leak:
+                        match = str(leak["Match"])
+                        if match:
+                            leak["Match"] = match[:4] + "****" if len(match) > 4 else "****"
+                        
+            # Overwrite the unencrypted report file with the masked version
+            with open(report_file, "w", encoding="utf-8") as fh:
+                json.dump(leaks, fh, indent=2)
+
         except (json.JSONDecodeError, OSError):
             return findings
 
@@ -69,9 +82,7 @@ class GitleaksTool(ToolBase):
             description = leak.get("Description", rule_id)
             file_path = leak.get("File", "")
             line = leak.get("StartLine", "?")
-            match = leak.get("Match", "")
-            # Mask the secret in evidence for safety
-            masked = match[:4] + "****" if len(match) > 4 else "****"
+            masked = leak.get("Match", "****")
 
             findings.append(
                 make_finding(
