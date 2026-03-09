@@ -77,6 +77,16 @@ git clone <your-repo-url>
 cd secscan_gui
 ```
 
+### 1b. Download with PowerShell (`iwr`)
+
+If someone does not have Git installed, they can download the repository ZIP from GitHub with PowerShell:
+
+```powershell
+iwr https://github.com/x1n-Q/SecScan/archive/refs/heads/main.zip -OutFile SecScan.zip
+Expand-Archive .\SecScan.zip -DestinationPath .
+cd .\SecScan-main
+```
+
 ### 2. Create and activate a virtual environment
 
 Windows:
