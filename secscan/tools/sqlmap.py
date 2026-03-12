@@ -14,6 +14,7 @@ class SqlmapTool(ToolBase):
     name = "Sqlmap"
     description = "SQL injection vulnerability scanner"
     cli_command = "sqlmap"
+    requires_website = True
 
     def is_applicable(self, project_path: str) -> bool:
         # Sqlmap is applicable to projects with a website URL

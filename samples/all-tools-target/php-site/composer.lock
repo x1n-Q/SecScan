@@ -1,0 +1,21 @@
+{
+  "_readme": [
+    "This is a handcrafted lockfile for SecScan applicability testing."
+  ],
+  "content-hash": "secscan-sample-content-hash",
+  "packages": [
+    {
+      "name": "symfony/http-foundation",
+      "version": "v2.7.0"
+    }
+  ],
+  "packages-dev": [],
+  "aliases": [],
+  "minimum-stability": "stable",
+  "stability-flags": {},
+  "prefer-stable": false,
+  "prefer-lowest": false,
+  "platform": {},
+  "platform-dev": {},
+  "plugin-api-version": "2.6.0"
+}

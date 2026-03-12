@@ -16,6 +16,7 @@ class AmassTool(ToolBase):
     name = "Amass"
     description = "Passive subdomain discovery for web targets"
     cli_command = "amass"
+    requires_website = True
 
     def is_applicable(self, project_path: str) -> bool:
         return True

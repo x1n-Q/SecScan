@@ -1,10 +1,11 @@
-"""Live log viewer widget."""
+"""Live log viewer widget – dark terminal style."""
 
 from __future__ import annotations
 
 from PySide6.QtWidgets import QTextEdit
 from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtCore import Slot
+from ui import theme as T
 
 
 class LogView(QTextEdit):
@@ -14,15 +15,7 @@ class LogView(QTextEdit):
         super().__init__(parent)
         self.setReadOnly(True)
         self.setFont(QFont("Consolas", 10))
-        self.setStyleSheet(
-            "QTextEdit {"
-            "  background-color: #1e1e2e;"
-            "  color: #cdd6f4;"
-            "  border: 1px solid #45475a;"
-            "  border-radius: 6px;"
-            "  padding: 8px;"
-            "}"
-        )
+        self.setStyleSheet(T.LOG_STYLE)
 
     @Slot(str)
     def append_log(self, text: str):

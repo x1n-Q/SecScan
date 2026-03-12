@@ -1,0 +1,7 @@
+{
+  "name": "secscan/sample-php-site",
+  "description": "Sample PHP target for SecScan",
+  "require": {
+    "symfony/http-foundation": "2.7.0"
+  }
+}

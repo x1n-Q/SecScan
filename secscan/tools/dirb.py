@@ -16,6 +16,7 @@ class DirbTool(ToolBase):
     name = "Dirb"
     description = "Directory and file discovery checks (pure Python)"
     cli_command = ""
+    requires_website = True
 
     def is_applicable(self, project_path: str) -> bool:
         # Dirb is applicable to projects with a website URL

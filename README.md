@@ -26,6 +26,10 @@ Do not use SecScan against systems, applications, APIs, domains, or networks you
 ### Software and supply chain
 
 - `npm audit`
+- `Composer Audit`
+- `bundler-audit`
+- `govulncheck`
+- `cargo-audit`
 - `OWASP Dependency-Check`
 - `OSV-Scanner`
 - `Grype`
@@ -37,24 +41,13 @@ Do not use SecScan against systems, applications, APIs, domains, or networks you
 
 - `Semgrep`
 - `Bandit`
-- `Gitleaks` ⚠️ (detects & masks hardcoded secrets; see `SCANNING_SAFELY.md`)
+- `Gitleaks` (detects and masks hardcoded secrets; see `SCANNING_SAFELY.md`)
 - `Trivy`
 - `Checkov`
 - `Kube-bench`
 - `Lynis`
 
 ### Web, recon, and network
-
-## Secret Scanning Safety
-
-**Gitleaks** scans repositories for accidentally committed secrets (API keys, tokens, passwords). If secrets are found:
-
-1. **They are masked in all reports** (first 4 chars + `****`)
-2. **Rotate the credential immediately** in all systems
-3. **Remove from history** using `git-filter-repo`
-4. **Force-push** the cleaned history
-
-See `SCANNING_SAFELY.md` for detailed remediation steps.
 
 - `Security Headers`
 - `TLS Certificate Check`
@@ -65,6 +58,21 @@ See `SCANNING_SAFELY.md` for detailed remediation steps.
 - `Sqlmap`
 - `XssPy`
 - `Amass`
+
+Tools marked `WEB ONLY` in the GUI or `[web only]` in the CLI require a website URL before they can run.
+
+## Secret Scanning Safety
+
+**Gitleaks** scans repositories for accidentally committed secrets. If secrets are found:
+
+1. **They are masked in all reports** (first 4 chars + `****`)
+2. **Rotate the credential immediately** in all systems
+3. **Remove from history** using `git-filter-repo`
+4. **Force-push** the cleaned history
+
+The committed sample content under `samples/` uses synthetic placeholders only. If you want a positive local secrets-scanner demo, create an ignored `.env.local` file instead of committing provider-shaped tokens.
+
+See `SCANNING_SAFELY.md` for detailed remediation steps.
 
 ## High-Risk Features
 
@@ -84,11 +92,13 @@ If you are publishing or forking this project, make the authorized-use warning v
 This project includes active security scanners. GitHub and other platforms prohibit using any tool for unauthorized access attempts or abusive scanning.
 
 **Allowed:**
+
 - scanning systems you own
 - authorized penetration testing with written permission
 - lab or classroom environments with permission
 
 **Prohibited:**
+
 - scanning third-party infrastructure without authorization
 - using the tool for credential theft, exfiltration, disruption, or stealth
 - bypassing authentication or access controls without approval
@@ -153,7 +163,7 @@ python -m secscan.main
 Typical GUI flow:
 
 1. select a local project folder, or import a GitHub repository
-2. optionally enter a website URL for web checks
+2. optionally enter a website URL for tools labeled `WEB ONLY`
 3. choose a scan mode
 4. run the scan
 5. review findings and export reports
@@ -194,6 +204,20 @@ python -m secscan.cli scan --repo ./my-project --url https://example.com --profi
 - `Recommended Scan` - a safer default for most project reviews
 - `Full Scan` - every available scanner that applies
 - `Web Scan` - focused on web, recon, and network checks
+
+Language-aware dependency checks now cover common manifests for PHP (`composer.json`), Ruby (`Gemfile`), Go (`go.mod`), Rust (`Cargo.toml`), Python, and Node.js. Project detection also recognizes additional ecosystems such as Dart, Elixir, Swift, and C/C++ so mixed-language repositories are described more accurately in the UI and CLI.
+
+## Sample Project
+
+Use `samples/all-tools-target` to exercise the non-website scanners from one folder. It includes Python, Node.js, Go, Rust, PHP, Ruby, Java, .NET, Docker, Terraform, and Kubernetes markers so the GUI and CLI can light up most scanners without needing a live website.
+
+The committed sample values are intentionally synthetic and safe for a public repository. They are there to make scanners applicable, not to store live credentials.
+
+To validate the sample coverage from the terminal, run:
+
+```powershell
+python samples\verify_all_tools_target.py
+```
 
 ## Output Layout
 

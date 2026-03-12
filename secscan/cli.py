@@ -38,18 +38,6 @@ from secscan.core.schema import Finding, ScanResult
 from secscan.core.security_score import calculate_score
 from secscan.tools import ALL_TOOLS
 
-_URL_REQUIRED_TOOLS = {
-    "Security Headers",
-    "TLS Certificate Check",
-    "OWASP ZAP",
-    "Nikto",
-    "Dirb",
-    "Nmap",
-    "Sqlmap",
-    "XssPy",
-    "Amass",
-}
-
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -148,7 +136,7 @@ def _run_scan(args: argparse.Namespace) -> int:
     if not args.url:
         applicable = [
             t for t in applicable
-            if t.name not in _URL_REQUIRED_TOOLS
+            if not t.requires_website
         ]
     tools = filter_tools_by_profile(applicable, profile)
 
@@ -281,7 +269,12 @@ def _list_tools() -> int:
     for tool in ALL_TOOLS:
         installed = "Installed" if tool.is_installed() else "Missing"
         print(f"  {tool.name:25s}  {installed}")
-        note = " [authorization required]" if tool.name in DANGEROUS_TOOL_NAMES else ""
+        notes = []
+        if tool.requires_website:
+            notes.append("web only")
+        if tool.name in DANGEROUS_TOOL_NAMES:
+            notes.append("authorization required")
+        note = f" [{' | '.join(notes)}]" if notes else ""
         print(f"    {tool.description}{note}")
         if not tool.is_installed():
             print(f"    Install: {tool.install_instructions().splitlines()[0]}")

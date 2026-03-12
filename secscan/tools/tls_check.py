@@ -17,6 +17,7 @@ class TlsCheckTool(ToolBase):
     name = "TLS Certificate Check"
     description = "Verify TLS certificate validity and expiration for a website"
     cli_command = ""  # Pure Python
+    requires_website = True
 
     def is_applicable(self, project_path: str) -> bool:
         return True  # Applicable when website_url is provided

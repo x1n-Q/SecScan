@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from typing import List
 
 from secscan.core.detect import find_kubernetes_files
@@ -17,7 +19,7 @@ class KubeBenchTool(ToolBase):
     cli_command = "kube-bench"
 
     def is_applicable(self, project_path: str) -> bool:
-        return bool(find_kubernetes_files(project_path))
+        return os.name != "nt" and bool(find_kubernetes_files(project_path))
 
     def install_instructions(self) -> str:
         return (
@@ -25,6 +27,9 @@ class KubeBenchTool(ToolBase):
             "  See https://github.com/aquasecurity/kube-bench\n"
             "This scanner audits the current host/cluster, not YAML files directly."
         )
+
+    def install_commands(self) -> List[List[str]]:
+        return [[sys.executable, "-m", "secscan.core.self_install", "kube-bench"]]
 
     def run(
         self,

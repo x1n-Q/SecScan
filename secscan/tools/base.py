@@ -5,6 +5,7 @@ from __future__ import annotations
 import glob
 import os
 import shutil
+import site
 import subprocess
 import sys
 from abc import ABC, abstractmethod
@@ -24,6 +25,9 @@ class ToolBase(ABC):
 
     # The CLI command used to check installation
     cli_command: str = ""
+
+    # Whether this scanner only applies when a website URL is supplied.
+    requires_website: bool = False
 
     # Mapping of CLI name -> pip package for tools installable in Python env.
     _PIP_INSTALL_MAP = {
@@ -184,6 +188,24 @@ class ToolBase(ABC):
                 commands.append(["brew", "install", "amass"])
             return commands
 
+        if cmd == "nmap":
+            commands = []
+            if is_windows and has("winget"):
+                commands.append(
+                    [
+                        "winget", "install",
+                        "--id", "Insecure.Nmap",
+                        "-e",
+                        "--accept-source-agreements",
+                        "--accept-package-agreements",
+                    ]
+                )
+            if is_windows and has("choco"):
+                commands.append(["choco", "install", "-y", "nmap"])
+            if has("brew"):
+                commands.append(["brew", "install", "nmap"])
+            return commands
+
         if cmd == "dependency-check":
             commands = []
             if is_windows and has("winget"):
@@ -273,21 +295,12 @@ class ToolBase(ABC):
         if found:
             return found
 
-        # Also check the active interpreter's script directory (venv-safe).
-        exe_dir = os.path.dirname(sys.executable)
-        candidates = [command]
-        if os.name == "nt":
-            lower = command.lower()
-            if not lower.endswith(".exe"):
-                candidates.append(f"{command}.exe")
-            if not lower.endswith(".cmd"):
-                candidates.append(f"{command}.cmd")
-            if not lower.endswith(".bat"):
-                candidates.append(f"{command}.bat")
-        for cand in candidates:
-            full = os.path.join(exe_dir, cand)
-            if os.path.isfile(full):
-                return full
+        candidates = ToolBase._candidate_executable_names(command)
+        for search_dir in ToolBase._extra_search_dirs():
+            for cand in candidates:
+                full = os.path.join(search_dir, cand)
+                if os.path.isfile(full):
+                    return full
 
         if os.name != "nt":
             return None
@@ -302,15 +315,166 @@ class ToolBase(ABC):
         if not os.path.isdir(winget_packages):
             return None
 
-        exe_name = command if command.lower().endswith(".exe") else f"{command}.exe"
-        pattern = os.path.join(winget_packages, "*", exe_name)
-        matches = glob.glob(pattern)
+        exe_names = [
+            cand for cand in candidates
+            if cand.lower().endswith((".exe", ".cmd", ".bat"))
+        ]
+        matches: list[str] = []
+        for exe_name in exe_names:
+            pattern = os.path.join(winget_packages, "*", "**", exe_name)
+            matches.extend(glob.glob(pattern, recursive=True))
         if not matches:
             return None
 
         # Pick most recently modified candidate to prefer latest package version.
         matches.sort(key=lambda p: os.path.getmtime(p), reverse=True)
         return matches[0]
+
+    @staticmethod
+    def _candidate_executable_names(command: str) -> list[str]:
+        """Return plausible executable filenames for a command."""
+        candidates = [command]
+        if os.name == "nt":
+            lower = command.lower()
+            if not lower.endswith(".exe"):
+                candidates.append(f"{command}.exe")
+            if not lower.endswith(".cmd"):
+                candidates.append(f"{command}.cmd")
+            if not lower.endswith(".bat"):
+                candidates.append(f"{command}.bat")
+        return list(dict.fromkeys(candidates))
+
+    @staticmethod
+    def _extra_search_dirs() -> list[str]:
+        """Return common user-level install locations outside the current PATH."""
+        dirs: list[str] = []
+        user_home = os.path.expanduser("~")
+
+        exe_dir = os.path.dirname(sys.executable)
+        if exe_dir:
+            dirs.append(exe_dir)
+
+        try:
+            user_base = site.getuserbase()
+        except Exception:
+            user_base = ""
+        if user_base:
+            dirs.append(os.path.join(user_base, "Scripts" if os.name == "nt" else "bin"))
+
+        if user_home:
+            dirs.extend(
+                [
+                    os.path.join(os.environ.get("GOPATH", os.path.join(user_home, "go")), "bin"),
+                    os.path.join(os.environ.get("CARGO_HOME", os.path.join(user_home, ".cargo")), "bin"),
+                    os.path.join(user_home, ".local", "bin"),
+                ]
+            )
+
+        if os.name == "nt":
+            app_data = os.environ.get("APPDATA", "")
+            local_app_data = os.environ.get("LOCALAPPDATA", "")
+            if app_data:
+                dirs.append(os.path.join(app_data, "Python", "Scripts"))
+                dirs.append(os.path.join(app_data, "Composer", "vendor", "bin"))
+            if local_app_data:
+                dirs.append(os.path.join(local_app_data, "Microsoft", "WindowsApps"))
+                dirs.append(os.path.join(local_app_data, "Programs", "Python", "Scripts"))
+                dirs.extend(ToolBase._windows_java_dirs())
+                dirs.extend(ToolBase._windows_go_dirs())
+                dirs.extend(ToolBase._windows_php_dirs())
+                dirs.extend(ToolBase._windows_ruby_dirs())
+                dirs.extend(ToolBase._windows_security_tool_dirs())
+
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for path in dirs:
+            norm = os.path.normcase(os.path.normpath(path)) if path else ""
+            if not norm or norm in seen or not os.path.isdir(path):
+                continue
+            seen.add(norm)
+            ordered.append(path)
+        return ordered
+
+    @staticmethod
+    def _windows_java_dirs() -> list[str]:
+        """Return common Java installation bin directories on Windows."""
+        roots = [
+            os.environ.get("ProgramFiles", ""),
+            os.environ.get("ProgramFiles(x86)", ""),
+            os.environ.get("LOCALAPPDATA", ""),
+        ]
+        patterns = (
+            ("Microsoft", "jdk-*", "bin"),
+            ("Java", "*", "bin"),
+            ("Eclipse Adoptium", "*", "bin"),
+            ("Zulu", "*", "bin"),
+            ("BellSoft", "*", "bin"),
+        )
+        found: list[str] = []
+        for root in roots:
+            if not root:
+                continue
+            for parts in patterns:
+                glob_pattern = os.path.join(root, *parts)
+                found.extend(glob.glob(glob_pattern))
+        return found
+
+    @staticmethod
+    def _windows_go_dirs() -> list[str]:
+        roots = [os.environ.get("ProgramFiles", ""), os.environ.get("ProgramFiles(x86)", "")]
+        found: list[str] = []
+        for root in roots:
+            if root:
+                found.extend(glob.glob(os.path.join(root, "Go", "bin")))
+        return found
+
+    @staticmethod
+    def _windows_php_dirs() -> list[str]:
+        roots = [os.environ.get("ProgramFiles", ""), os.environ.get("ProgramFiles(x86)", "")]
+        found: list[str] = []
+        for root in roots:
+            if not root:
+                continue
+            found.extend(glob.glob(os.path.join(root, "PHP", "*")))
+            found.extend(glob.glob(os.path.join(root, "PHP", "*", "bin")))
+        return found
+
+    @staticmethod
+    def _windows_ruby_dirs() -> list[str]:
+        roots = [
+            os.environ.get("SystemDrive", "C:"),
+            os.environ.get("LOCALAPPDATA", ""),
+        ]
+        patterns = (
+            ("Ruby*", "bin"),
+            ("Programs", "Ruby*", "bin"),
+        )
+        found: list[str] = []
+        for root in roots:
+            if not root:
+                continue
+            if len(root) == 2 and root[1] == ":":
+                root = root + os.sep
+            for parts in patterns:
+                found.extend(glob.glob(os.path.join(root, *parts)))
+        return found
+
+    @staticmethod
+    def _windows_security_tool_dirs() -> list[str]:
+        roots = [os.environ.get("ProgramFiles", ""), os.environ.get("ProgramFiles(x86)", "")]
+        patterns = (
+            ("Nmap",),
+            ("ZAP",),
+            ("OWASP", "ZAP"),
+            ("OWASP ZAP",),
+        )
+        found: list[str] = []
+        for root in roots:
+            if not root:
+                continue
+            for parts in patterns:
+                found.extend(glob.glob(os.path.join(root, *parts)))
+        return found
 
     @staticmethod
     def _save_raw(raw_dir: str, filename: str, content: str) -> str:

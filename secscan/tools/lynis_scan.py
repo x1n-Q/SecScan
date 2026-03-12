@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from typing import List
 
 from secscan.core.normalize import make_finding
@@ -25,6 +26,23 @@ class LynisTool(ToolBase):
             "  macOS: brew install lynis\n"
             "This scanner audits the current machine, not just the selected folder."
         )
+
+    def install_commands(self) -> List[List[str]]:
+        if os.name == "nt":
+            return []
+        commands: List[List[str]] = []
+        if shutil.which("brew"):
+            commands.append(["brew", "install", "lynis"])
+        if shutil.which("apt-get"):
+            commands.append(["apt-get", "update"])
+            commands.append(["apt-get", "install", "-y", "lynis"])
+        if shutil.which("dnf"):
+            commands.append(["dnf", "install", "-y", "lynis"])
+        if shutil.which("yum"):
+            commands.append(["yum", "install", "-y", "lynis"])
+        if shutil.which("pacman"):
+            commands.append(["pacman", "-Sy", "--noconfirm", "lynis"])
+        return commands
 
     def run(
         self,

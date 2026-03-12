@@ -15,6 +15,7 @@ class NmapTool(ToolBase):
     name = "Nmap"
     description = "Network port and service scanner"
     cli_command = "nmap"
+    requires_website = True
 
     def is_applicable(self, project_path: str) -> bool:
         # Nmap is applicable to projects with a website URL

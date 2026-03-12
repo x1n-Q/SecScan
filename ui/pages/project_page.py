@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) SecScan Contributors
 # See LICENSE and SECURITY.md for usage terms
-"""Project selection page with local folder + GitHub import."""
+"""Project selection page – dark-themed, compact cards."""
 
 from __future__ import annotations
 
@@ -10,73 +10,46 @@ import os
 from PySide6.QtCore import QObject, QThread, Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QApplication,
-    QFileDialog,
-    QFrame,
-    QGridLayout,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
+    QApplication, QFileDialog, QFrame, QGridLayout,
+    QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from secscan.core.detect import ProjectInfo, detect_project
 from secscan.core.github_repo import clone_or_update_github_repo
 from secscan.core.safety import normalize_target_url
+from ui import theme as T
 
 
-_CARD_STYLE = (
-    "QFrame { background: #ffffff; border: 1px solid #dce1ea; border-radius: 10px; }"
-)
-_INPUT_STYLE = (
-    "QLineEdit { color: #212121; background: #fafbfd; border: 1px solid #c7d0db; "
-    "border-radius: 8px; padding: 8px 12px; min-height: 34px; font-size: 12px; }"
-    "QLineEdit:focus { border: 1.5px solid #1a237e; background: #fff; }"
-    "QLineEdit:read-only { background: #f0f2f5; color: #546e7a; }"
-)
-_BTN_STYLE = (
-    "QPushButton { background: %s; color: %s; border: none; border-radius: 8px; "
-    "padding: 8px 14px; min-height: 34px; font-size: 12px; font-weight: bold; }"
-    "QPushButton:hover { background: %s; }"
-    "QPushButton:disabled { background: #bdbdbd; color: #fafafa; }"
-)
-_LBL = "color: #37474f; font-size: 12px; font-weight: 600;"
-_SUB = "color: #78909c; font-size: 11px;"
-_INFO_VALUE_STYLE = (
-    "color: #212121; font-size: 12px; font-weight: bold; "
-    "background: transparent; border: none; padding: 0px;"
-)
-_DIALOG_STYLE = (
-    "QMessageBox { background: #ffffff; }"
-    "QLabel { color: #111111; font-size: 12px; }"
-    "QPushButton { min-width: 88px; color: #111111; background: #f3f6f9; "
-    "border: 1px solid #90a4ae; border-radius: 6px; padding: 5px 12px; }"
-    "QPushButton:hover { background: #e3f2fd; border-color: #64b5f6; }"
-)
-
-
-def _btn(text: str, bg: str, hover: str, fg: str = "white") -> QPushButton:
+def _btn(text: str, bg: str, hover: str, fg: str = T.TEXT_PRIMARY) -> QPushButton:
     b = QPushButton(text)
     b.setCursor(Qt.CursorShape.PointingHandCursor)
-    b.setStyleSheet(_BTN_STYLE % (bg, fg, hover))
+    b.setStyleSheet(T.btn_style(bg, hover, fg))
     return b
 
 
-def _make_label(text: str, style: str = _LBL) -> QLabel:
-    """Create a QLabel that won't look like an input field."""
+def _lbl(text: str, muted: bool = False) -> QLabel:
     lbl = QLabel(text)
-    lbl.setStyleSheet(style + " background: transparent; border: none; padding: 0px;")
+    color = T.TEXT_MUTED if muted else T.TEXT_SECONDARY
+    lbl.setStyleSheet(
+        f"color: {color}; font-size: 12px; font-weight: 600; "
+        f"background: transparent; border: none; padding: 0px;"
+    )
+    return lbl
+
+
+def _section_header(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+    lbl.setStyleSheet(
+        f"color: {T.ACCENT_HOVER}; background: transparent; border: none;"
+    )
     return lbl
 
 
 class _CloneWorker(QObject):
     """Background worker for git clone/pull operations."""
-
-    success = Signal(str, str)  # local_path, action_message
+    success = Signal(str, str)
     error = Signal(str)
     finished = Signal()
 
@@ -106,7 +79,7 @@ class _CloneWorker(QObject):
 class ProjectPage(QWidget):
     """First page: select project folder and optional website URL."""
 
-    project_selected = Signal(object)  # ProjectInfo
+    project_selected = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -123,133 +96,142 @@ class ProjectPage(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet("QScrollArea { background: #f5f5f5; border: none; }")
-        scroll.viewport().setStyleSheet("background: #f5f5f5;")
+        scroll.setStyleSheet(T.SCROLL_STYLE)
+        scroll.viewport().setStyleSheet(f"background: {T.BG_DARK};")
         outer.addWidget(scroll)
 
         container = QWidget()
-        container.setStyleSheet("background: #f5f5f5;")
+        container.setStyleSheet(f"background: {T.BG_DARK};")
         root = QVBoxLayout(container)
-        root.setContentsMargins(24, 20, 24, 16)
-        root.setSpacing(14)
+        root.setContentsMargins(28, 22, 28, 16)
+        root.setSpacing(12)
         scroll.setWidget(container)
 
+        # Page title
         title = QLabel("Project Setup")
         title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
-        title.setStyleSheet("color: #1a237e; background: transparent; border: none;")
+        title.setStyleSheet(
+            f"color: {T.TEXT_PRIMARY}; background: transparent; border: none;"
+        )
         root.addWidget(title)
 
         subtitle = QLabel(
             "Select a local project folder or import from GitHub, then add an optional website URL."
         )
         subtitle.setWordWrap(True)
-        subtitle.setStyleSheet("color: #546e7a; font-size: 12px; background: transparent; border: none;")
+        subtitle.setStyleSheet(
+            f"color: {T.TEXT_MUTED}; font-size: 12px; background: transparent; border: none;"
+        )
         root.addWidget(subtitle)
 
-        # ── Local Project Folder Card ──────────────────────────────
+        # ── Local Project Folder Card ──────────────────
         folder_card = QFrame()
-        folder_card.setStyleSheet(_CARD_STYLE)
+        folder_card.setStyleSheet(T.CARD_STYLE)
         f_lay = QVBoxLayout(folder_card)
         f_lay.setContentsMargins(14, 12, 14, 12)
         f_lay.setSpacing(8)
-        f_lay.addWidget(_make_label("Local Project Folder"))
+        f_lay.addWidget(_section_header("📁  Local Project Folder"))
 
         f_row = QHBoxLayout()
         self._folder_edit = QLineEdit()
         self._folder_edit.setReadOnly(True)
-        self._folder_edit.setPlaceholderText("Choose a project folder...")
-        self._folder_edit.setStyleSheet(_INPUT_STYLE)
+        self._folder_edit.setPlaceholderText("Choose a project folder…")
+        self._folder_edit.setStyleSheet(T.INPUT_STYLE)
         f_row.addWidget(self._folder_edit, 1)
-        browse_btn = _btn("Browse...", "#1a237e", "#283593")
+        browse_btn = _btn("Browse…", T.ACCENT, T.ACCENT_HOVER)
         browse_btn.clicked.connect(self._browse_folder)
         f_row.addWidget(browse_btn)
         f_lay.addLayout(f_row)
         root.addWidget(folder_card)
 
-        # ── GitHub Import Card (Simplified) ────────────────────────
+        # ── GitHub Import Card ─────────────────────────
         gh_card = QFrame()
-        gh_card.setStyleSheet(_CARD_STYLE)
+        gh_card.setStyleSheet(T.CARD_STYLE)
         g_lay = QVBoxLayout(gh_card)
         g_lay.setContentsMargins(14, 12, 14, 12)
         g_lay.setSpacing(8)
-        g_lay.addWidget(_make_label("GitHub Import"))
-        g_lay.addWidget(_make_label(
+        g_lay.addWidget(_section_header("🔗  GitHub Import"))
+        g_lay.addWidget(_lbl(
             "Enter a repo URL and click Clone / Pull. "
             "For private repos, paste a Personal Access Token (PAT).",
-            _SUB
+            muted=True,
         ))
 
-        # Repository URL row
+        # Repo URL row
         repo_row = QHBoxLayout()
-        repo_row.addWidget(_make_label("Repository:"))
+        repo_row.addWidget(_lbl("Repository:"))
         self._repo_url_edit = QLineEdit()
         self._repo_url_edit.setPlaceholderText("https://github.com/owner/repo  or  owner/repo")
-        self._repo_url_edit.setStyleSheet(_INPUT_STYLE)
+        self._repo_url_edit.setStyleSheet(T.INPUT_STYLE)
         repo_row.addWidget(self._repo_url_edit, 1)
-        repo_row.addWidget(_make_label("Branch:"))
+        repo_row.addWidget(_lbl("Branch:"))
         self._repo_branch_edit = QLineEdit()
         self._repo_branch_edit.setPlaceholderText("Optional")
-        self._repo_branch_edit.setStyleSheet(_INPUT_STYLE)
-        self._repo_branch_edit.setMaximumWidth(150)
+        self._repo_branch_edit.setStyleSheet(T.INPUT_STYLE)
+        self._repo_branch_edit.setMaximumWidth(140)
         repo_row.addWidget(self._repo_branch_edit)
         g_lay.addLayout(repo_row)
 
-        # Token row (primary auth method)
+        # Token row
         token_row = QHBoxLayout()
-        token_row.addWidget(_make_label("Access Token:"))
+        token_row.addWidget(_lbl("Access Token:"))
         self._repo_token_edit = QLineEdit()
         self._repo_token_edit.setPlaceholderText("Paste GitHub PAT for private repos (leave blank for public)")
         self._repo_token_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self._repo_token_edit.setStyleSheet(_INPUT_STYLE)
+        self._repo_token_edit.setStyleSheet(T.INPUT_STYLE)
         token_row.addWidget(self._repo_token_edit, 1)
-        self._show_token_btn = _btn("Show", "#78909c", "#90a4ae")
-        self._show_token_btn.setFixedWidth(60)
+        self._show_token_btn = _btn("Show", T.BG_SURFACE, T.BG_HOVER)
+        self._show_token_btn.setFixedWidth(56)
         self._show_token_btn.clicked.connect(self._toggle_token_visibility)
         token_row.addWidget(self._show_token_btn)
         g_lay.addLayout(token_row)
 
-        # Destination + clone button row
+        # Destination + clone
         dest_row = QHBoxLayout()
-        dest_row.addWidget(_make_label("Clone to:"))
+        dest_row.addWidget(_lbl("Clone to:"))
         self._repo_root_edit = QLineEdit(self._default_repo_root)
-        self._repo_root_edit.setStyleSheet(_INPUT_STYLE)
+        self._repo_root_edit.setStyleSheet(T.INPUT_STYLE)
         dest_row.addWidget(self._repo_root_edit, 1)
-        change_btn = _btn("Change...", "#78909c", "#90a4ae")
+        change_btn = _btn("Change…", T.BG_SURFACE, T.BG_HOVER)
         change_btn.clicked.connect(self._browse_repo_root)
         dest_row.addWidget(change_btn)
-        self._import_btn = _btn("Clone / Pull", "#1565c0", "#1976d2")
+        self._import_btn = _btn("Clone / Pull", T.INFO_BG, T.INFO)
+        self._import_btn.setStyleSheet(T.btn_style("#0369a1", "#0284c7"))
         self._import_btn.clicked.connect(self._import_from_github)
         dest_row.addWidget(self._import_btn)
         g_lay.addLayout(dest_row)
 
         self._import_status = QLabel("Ready")
-        self._import_status.setStyleSheet(_SUB + " background: transparent; border: none;")
+        self._import_status.setStyleSheet(
+            f"color: {T.TEXT_MUTED}; font-size: 11px; background: transparent; border: none;"
+        )
         self._import_status.setWordWrap(True)
         g_lay.addWidget(self._import_status)
         root.addWidget(gh_card)
 
-        # ── Website URL Card ───────────────────────────────────────
+        # ── Website URL Card ───────────────────────────
         url_card = QFrame()
-        url_card.setStyleSheet(_CARD_STYLE)
+        url_card.setStyleSheet(T.CARD_STYLE)
         u_lay = QVBoxLayout(url_card)
         u_lay.setContentsMargins(14, 12, 14, 12)
         u_lay.setSpacing(8)
-        u_lay.addWidget(_make_label("Website URL (optional)"))
+        u_lay.addWidget(_section_header("🌐  Website URL (optional)"))
         self._url_edit = QLineEdit()
         self._url_edit.setPlaceholderText("https://example.com")
-        self._url_edit.setStyleSheet(_INPUT_STYLE)
+        self._url_edit.setStyleSheet(T.INPUT_STYLE)
         u_lay.addWidget(self._url_edit)
         root.addWidget(url_card)
 
-        # ── Detected Project Info Card ─────────────────────────────
+        # ── Detected Info Card ─────────────────────────
         self._info_card = QFrame()
-        self._info_card.setStyleSheet(_CARD_STYLE)
+        self._info_card.setStyleSheet(T.CARD_STYLE)
         i_lay = QVBoxLayout(self._info_card)
         i_lay.setContentsMargins(14, 12, 14, 12)
-        i_lay.setSpacing(8)
-        i_lay.addWidget(_make_label("Detected Project Info"))
+        i_lay.setSpacing(6)
+        i_lay.addWidget(_section_header("🔍  Detected Project Info"))
 
         grid = QGridLayout()
+        grid.setSpacing(4)
         self._lbl_types = QLabel("-")
         self._lbl_languages = QLabel("-")
         self._lbl_dep_files = QLabel("-")
@@ -264,30 +246,32 @@ class ProjectPage(QWidget):
             ("Dockerfile:", self._lbl_docker),
             ("IaC files:", self._lbl_iac),
         ]
+        val_style = (
+            f"color: {T.TEXT_PRIMARY}; font-size: 12px; font-weight: bold; "
+            f"background: transparent; border: none; padding: 0px;"
+        )
         for r, (k, v) in enumerate(values):
-            key_lbl = _make_label(k)
-            grid.addWidget(key_lbl, r, 0)
-            v.setStyleSheet(_INFO_VALUE_STYLE)
+            grid.addWidget(_lbl(k), r, 0)
+            v.setStyleSheet(val_style)
             v.setWordWrap(True)
             grid.addWidget(v, r, 1)
         i_lay.addLayout(grid)
         self._info_card.setVisible(False)
         root.addWidget(self._info_card)
 
-        # ── Continue button ────────────────────────────────────────
+        # ── Continue button ────────────────────────────
         bottom = QHBoxLayout()
         bottom.addStretch()
-        self._continue_btn = _btn("Continue to Tools ->", "#2e7d32", "#388e3c")
-        self._continue_btn.setMinimumHeight(42)
+        self._continue_btn = _btn("Continue to Tools  →", T.SUCCESS_HOVER, T.SUCCESS)
+        self._continue_btn.setStyleSheet(T.btn_style(T.SUCCESS_HOVER, T.SUCCESS))
+        self._continue_btn.setMinimumHeight(40)
         self._continue_btn.setEnabled(False)
         self._continue_btn.clicked.connect(self._on_continue)
         bottom.addWidget(self._continue_btn)
         root.addLayout(bottom)
         root.addStretch()
 
-    # ────────────────────────────────────────────────────────────────
-    # Actions
-    # ────────────────────────────────────────────────────────────────
+    # ── Actions ────────────────────────────────────────────────────
     def _toggle_token_visibility(self):
         if self._repo_token_edit.echoMode() == QLineEdit.EchoMode.Password:
             self._repo_token_edit.setEchoMode(QLineEdit.EchoMode.Normal)
@@ -304,8 +288,7 @@ class ProjectPage(QWidget):
 
     def _browse_repo_root(self):
         path = QFileDialog.getExistingDirectory(
-            self,
-            "Select Local Folder for GitHub Repositories",
+            self, "Select Local Folder for GitHub Repositories",
             self._repo_root_edit.text().strip() or self._default_repo_root,
         )
         if path:
@@ -325,15 +308,14 @@ class ProjectPage(QWidget):
             )
             return
 
-        # If a clone is already running, ignore
         if self._clone_thread is not None:
             return
 
         self._import_btn.setEnabled(False)
-        self._import_status.setText("⏳ Cloning / pulling repository...")
+        self._import_status.setText("⏳ Cloning / pulling repository…")
         self._import_status.setStyleSheet(
-            "color: #1565c0; font-size: 11px; font-weight: bold; "
-            "background: transparent; border: none;"
+            f"color: {T.INFO}; font-size: 11px; font-weight: bold; "
+            f"background: transparent; border: none;"
         )
 
         self._clone_thread = QThread()
@@ -351,16 +333,16 @@ class ProjectPage(QWidget):
         self._detect(local_path)
         self._import_status.setText(f"✅ {action} Ready to scan: {local_path}")
         self._import_status.setStyleSheet(
-            "color: #2e7d32; font-size: 11px; font-weight: bold; "
-            "background: transparent; border: none;"
+            f"color: {T.SUCCESS}; font-size: 11px; font-weight: bold; "
+            f"background: transparent; border: none;"
         )
 
     def _on_clone_error(self, message: str):
         self._repo_token_edit.clear()
-        self._import_status.setText(f"❌ Import failed.")
+        self._import_status.setText("❌ Import failed.")
         self._import_status.setStyleSheet(
-            "color: #c62828; font-size: 11px; font-weight: bold; "
-            "background: transparent; border: none;"
+            f"color: {T.DANGER}; font-size: 11px; font-weight: bold; "
+            f"background: transparent; border: none;"
         )
         self._show_message("GitHub Import Failed", message, icon=QMessageBox.Icon.Critical)
 
@@ -380,7 +362,10 @@ class ProjectPage(QWidget):
         self._lbl_dep_files.setText(", ".join(info.dependency_files) or "-")
         self._lbl_frameworks.setText(", ".join(info.frameworks) or "-")
         self._lbl_docker.setText("Yes" if info.has_dockerfile else "No")
-        self._lbl_iac.setText(", ".join(info.iac_types) if info.iac_types else ("Yes" if info.has_iac else "No"))
+        self._lbl_iac.setText(
+            ", ".join(info.iac_types) if info.iac_types
+            else ("Yes" if info.has_iac else "No")
+        )
         self._info_card.setVisible(True)
         self._continue_btn.setEnabled(True)
 
@@ -405,7 +390,7 @@ class ProjectPage(QWidget):
         box.setIcon(icon)
         box.setText(text)
         box.addButton("OK", QMessageBox.ButtonRole.AcceptRole)
-        box.setStyleSheet(_DIALOG_STYLE)
+        box.setStyleSheet(T.DIALOG_STYLE)
         box.exec()
 
     @property

@@ -55,6 +55,7 @@ class WebHeadersTool(ToolBase):
     name = "Security Headers"
     description = "Check a website for missing security HTTP headers"
     cli_command = ""  # Pure Python – no external binary
+    requires_website = True
 
     def is_applicable(self, project_path: str) -> bool:
         # Only applicable when a website URL is provided

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import sys
 from typing import List
 
 from secscan.core.schema import Finding, Category, Severity
@@ -15,10 +17,20 @@ class ZapTool(ToolBase):
     name = "OWASP ZAP"
     description = "Web vulnerability scanner"
     cli_command = "zap-cli"
+    requires_website = True
 
     def is_applicable(self, project_path: str) -> bool:
         # ZAP is applicable to projects with a website URL
         return True
+
+    def is_installed(self) -> bool:
+        zap_cli = self._resolve_executable("zap-cli")
+        zap_core = (
+            self._resolve_executable("ZAP.exe")
+            or self._resolve_executable("zap.bat")
+            or self._resolve_executable("zap.sh")
+        )
+        return zap_cli is not None and zap_core is not None
 
     def install_instructions(self) -> str:
         return (
@@ -26,6 +38,23 @@ class ZapTool(ToolBase):
             "  Download ZAP from https://www.zaproxy.org/download/\n"
             "  Install zap-cli: pip install zapcli"
         )
+
+    def install_commands(self) -> List[List[str]]:
+        commands: List[List[str]] = []
+        if os.name == "nt" and shutil.which("winget"):
+            commands.append(
+                [
+                    "winget",
+                    "install",
+                    "--id",
+                    "ZAP.ZAP",
+                    "-e",
+                    "--accept-source-agreements",
+                    "--accept-package-agreements",
+                ]
+            )
+        commands.append([sys.executable, "-m", "pip", "install", "zapcli"])
+        return commands
 
     def run(
         self,

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import sys
 from typing import List
 
 from secscan.core.detect import find_project_files
@@ -45,13 +47,38 @@ class DependencyCheckTool(ToolBase):
         patterns = [name for name in _DEPENDENCY_MARKERS if "*" in name]
         return bool(find_project_files(project_path, names=exact, patterns=patterns))
 
+    def is_installed(self) -> bool:
+        return (
+            self._resolve_executable(self.cli_command) is not None
+            and self._resolve_executable("java") is not None
+        )
+
     def install_instructions(self) -> str:
         return (
             "Install OWASP Dependency-Check:\n"
-            "  Windows: winget install OWASP.DependencyCheck\n"
+            "  Windows: the SecScan install button downloads the official release and also needs Java 11+\n"
             "  macOS: brew install dependency-check\n"
             "  Or download from https://owasp.org/www-project-dependency-check/"
         )
+
+    def install_commands(self) -> List[List[str]]:
+        commands: List[List[str]] = []
+        if self._resolve_executable("java") is None and os.name == "nt" and shutil.which("winget"):
+            commands.append(
+                [
+                    "winget",
+                    "install",
+                    "--id",
+                    "Microsoft.OpenJDK.17",
+                    "-e",
+                    "--accept-source-agreements",
+                    "--accept-package-agreements",
+                ]
+            )
+        if shutil.which("brew"):
+            commands.append(["brew", "install", "dependency-check"])
+        commands.append([sys.executable, "-m", "secscan.core.self_install", "dependency-check"])
+        return commands
 
     def run(
         self,

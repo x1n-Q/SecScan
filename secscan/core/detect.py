@@ -46,6 +46,13 @@ _MARKERS: dict[str, str] = {
     "Gemfile.lock": "ruby",
     "composer.json": "php",
     "composer.lock": "php",
+    "mix.exs": "elixir",
+    "mix.lock": "elixir",
+    "pubspec.yaml": "dart",
+    "pubspec.lock": "dart",
+    "Package.swift": "swift",
+    "CMakeLists.txt": "cpp",
+    "Makefile": "c-cpp",
     "*.csproj": "dotnet",
     "*.sln": "dotnet",
 }
@@ -72,6 +79,13 @@ _DEPENDENCY_FILES: dict[str, str] = {
     "Gemfile.lock": "ruby",
     "composer.json": "php",
     "composer.lock": "php",
+    "mix.exs": "elixir",
+    "mix.lock": "elixir",
+    "pubspec.yaml": "dart",
+    "pubspec.lock": "dart",
+    "Package.swift": "swift",
+    "CMakeLists.txt": "cpp",
+    "Makefile": "c-cpp",
 }
 
 # Language label mapping
@@ -84,6 +98,12 @@ _TYPE_TO_LANGUAGE: dict[str, str] = {
     "java-gradle": "java",
     "ruby": "ruby",
     "php": "php",
+    "elixir": "elixir",
+    "dart": "dart",
+    "swift": "swift",
+    "objective-c": "objective-c",
+    "cpp": "cpp",
+    "c-cpp": "cpp",
     "dotnet": "csharp",
 }
 
@@ -164,6 +184,17 @@ _SOURCE_LANGUAGE_PATTERNS: dict[str, str] = {
     "*.kt": "kotlin",
     "*.swift": "swift",
     "*.scala": "scala",
+    "*.dart": "dart",
+    "*.ex": "elixir",
+    "*.exs": "elixir",
+    "*.c": "c",
+    "*.cc": "cpp",
+    "*.cpp": "cpp",
+    "*.cxx": "cpp",
+    "*.h": "c",
+    "*.hh": "cpp",
+    "*.hpp": "cpp",
+    "*.m": "objective-c",
     "*.html": "html",
     "*.css": "css",
     "*.scss": "scss",
@@ -196,6 +227,12 @@ _LANGUAGE_TO_TYPE: dict[str, str] = {
     "java": "java-maven",
     "csharp": "dotnet",
     "ruby": "ruby",
+    "elixir": "elixir",
+    "dart": "dart",
+    "swift": "swift",
+    "cpp": "cpp",
+    "c": "cpp",
+    "objective-c": "objective-c",
 }
 
 _K8S_MARKERS = (
@@ -315,11 +352,22 @@ def find_python_projects(path: str, max_depth: int = _MAX_SCAN_DEPTH) -> list[st
     )
 
 
-def find_npm_projects(path: str, max_depth: int = _MAX_SCAN_DEPTH) -> list[str]:
-    """Return directories that contain a package.json manifest."""
-    manifests = find_project_files(path, names=("package.json",), max_depth=max_depth)
+def find_manifest_projects(
+    path: str,
+    *,
+    names: Sequence[str] = (),
+    patterns: Sequence[str] = (),
+    max_depth: int = _MAX_SCAN_DEPTH,
+) -> list[str]:
+    """Return directories that contain one of the given manifest files."""
+    manifests = find_project_files(
+        path,
+        names=names,
+        patterns=patterns,
+        max_depth=max_depth,
+    )
     project_dirs = {
-        path if rel_path == "package.json" else os.path.join(path, os.path.dirname(rel_path))
+        path if "/" not in rel_path else os.path.join(path, os.path.dirname(rel_path))
         for rel_path in manifests
     }
     return sorted(
@@ -329,6 +377,39 @@ def find_npm_projects(path: str, max_depth: int = _MAX_SCAN_DEPTH) -> list[str]:
             p.lower(),
         ),
     )
+
+
+def find_npm_projects(path: str, max_depth: int = _MAX_SCAN_DEPTH) -> list[str]:
+    """Return directories that contain a package.json manifest."""
+    return find_manifest_projects(path, names=("package.json",), max_depth=max_depth)
+
+
+def find_composer_projects(path: str, max_depth: int = _MAX_SCAN_DEPTH) -> list[str]:
+    """Return directories that contain Composer manifests."""
+    return find_manifest_projects(
+        path,
+        names=("composer.json", "composer.lock"),
+        max_depth=max_depth,
+    )
+
+
+def find_ruby_projects(path: str, max_depth: int = _MAX_SCAN_DEPTH) -> list[str]:
+    """Return directories that contain Bundler manifests."""
+    return find_manifest_projects(
+        path,
+        names=("Gemfile", "Gemfile.lock"),
+        max_depth=max_depth,
+    )
+
+
+def find_go_projects(path: str, max_depth: int = _MAX_SCAN_DEPTH) -> list[str]:
+    """Return directories that contain Go modules."""
+    return find_manifest_projects(path, names=("go.mod",), max_depth=max_depth)
+
+
+def find_rust_projects(path: str, max_depth: int = _MAX_SCAN_DEPTH) -> list[str]:
+    """Return directories that contain Cargo manifests."""
+    return find_manifest_projects(path, names=("Cargo.toml",), max_depth=max_depth)
 
 
 def detect_project(path: str, website_url: str = "") -> ProjectInfo:

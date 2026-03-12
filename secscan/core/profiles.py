@@ -36,7 +36,16 @@ class ScanProfile:
 
 # --- Tool name constants (must match ToolBase.name in each adapter) -------
 _DEPENDENCY_TOOLS = {
-    "npm audit", "OWASP Dependency-Check", "OSV-Scanner", "Grype", "pip-audit", "Safety",
+    "npm audit",
+    "OWASP Dependency-Check",
+    "OSV-Scanner",
+    "Grype",
+    "pip-audit",
+    "Safety",
+    "Composer Audit",
+    "bundler-audit",
+    "govulncheck",
+    "cargo-audit",
 }
 _SECRET_TOOLS = {
     "Gitleaks",
@@ -82,7 +91,16 @@ PROFILES: dict[ProfileName, ScanProfile] = {
     ProfileName.QUICK: ScanProfile(
         name=ProfileName.QUICK,
         description="Fast scan for common dependency and secret issues",
-        tool_names={"npm audit", "OSV-Scanner", "Gitleaks"},
+        tool_names={
+            "npm audit",
+            "OSV-Scanner",
+            "pip-audit",
+            "Composer Audit",
+            "bundler-audit",
+            "govulncheck",
+            "cargo-audit",
+            "Gitleaks",
+        },
         fail_on_severities=set(),
     ),
     ProfileName.RECOMMENDED: ScanProfile(
@@ -91,6 +109,11 @@ PROFILES: dict[ProfileName, ScanProfile] = {
         tool_names={
             "npm audit",
             "OSV-Scanner",
+            "pip-audit",
+            "Composer Audit",
+            "bundler-audit",
+            "govulncheck",
+            "cargo-audit",
             "Semgrep",
             "Gitleaks",
             "Trivy",

@@ -73,6 +73,14 @@ References:
 
 ---
 
+## Public Repository Samples
+
+The sample target under `samples/all-tools-target` is committed with synthetic placeholders only. Those values are intentionally safe to publish and should not be replaced with provider-shaped tokens before pushing to GitHub.
+
+If you want local-only positive Gitleaks findings, create an ignored `.env.local` file in the sample directory and keep it out of commits.
+
+---
+
 ## Audit Trail
 
 Each scan writes a `scan_audit.log` file under the scan output directory with:

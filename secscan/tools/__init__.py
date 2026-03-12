@@ -2,9 +2,13 @@
 
 from secscan.tools.npm_audit import NpmAuditTool
 from secscan.tools.bandit_scan import BanditTool
+from secscan.tools.bundler_audit import BundlerAuditTool
+from secscan.tools.cargo_audit import CargoAuditTool
+from secscan.tools.composer_audit import ComposerAuditTool
 from secscan.tools.dependency_check import DependencyCheckTool
 from secscan.tools.osv_scanner import OsvScannerTool
 from secscan.tools.grype_scan import GrypeTool
+from secscan.tools.govulncheck import GovulncheckTool
 from secscan.tools.cyclonedx_sbom import CycloneDxSbomTool
 from secscan.tools.gitleaks import GitleaksTool
 from secscan.tools.semgrep import SemgrepTool
@@ -27,9 +31,13 @@ from secscan.tools.amass_scan import AmassTool
 ALL_TOOLS = [
     NpmAuditTool(),
     BanditTool(),
+    BundlerAuditTool(),
+    CargoAuditTool(),
+    ComposerAuditTool(),
     DependencyCheckTool(),
     OsvScannerTool(),
     GrypeTool(),
+    GovulncheckTool(),
     CycloneDxSbomTool(),
     GitleaksTool(),
     SemgrepTool(),

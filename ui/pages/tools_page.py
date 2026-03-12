@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) SecScan Contributors
 # See LICENSE and SECURITY.md for usage terms
-"""Tools page: list scanners, status, and tool installation controls."""
+"""Tools page – dark-themed scanner list with compact cards."""
 
 from __future__ import annotations
 
@@ -10,17 +10,9 @@ from typing import List, Optional
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QMessageBox,
-    QProgressBar,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
+    QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel,
+    QMessageBox, QProgressBar, QPushButton, QScrollArea,
+    QVBoxLayout, QWidget,
 )
 
 from secscan.core.detect import ProjectInfo
@@ -29,37 +21,34 @@ from secscan.core.profiles import PROFILES, ProfileName
 from secscan.core.safety import DANGEROUS_TOOL_NAMES, dangerous_tools_selected, normalize_target_url
 from secscan.tools import ALL_TOOLS
 from secscan.tools.base import ToolBase
-
-_URL_REQUIRED_TOOLS = {
-    "Security Headers",
-    "TLS Certificate Check",
-    "OWASP ZAP",
-    "Nikto",
-    "Dirb",
-    "Nmap",
-    "Sqlmap",
-    "XssPy",
-    "Amass",
-}
+from ui import theme as T
 
 
 class _ToolCard(QFrame):
-    """A single card representing one scanner tool."""
+    """A compact dark card for one scanner tool."""
 
-    def __init__(self, tool: ToolBase, applicable: bool, checked: bool = False, parent=None):
+    def __init__(
+        self,
+        tool: ToolBase,
+        applicable: bool,
+        checked: bool = False,
+        blocked_reason: str = "",
+        parent=None,
+    ):
         super().__init__(parent)
         self.tool = tool
         self._applicable = applicable
+        self._blocked_reason = blocked_reason
 
-        self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(
-            "QFrame { background: #fff; border: 1px solid #ddd; "
-            "border-radius: 8px; padding: 12px; }"
+            f"QFrame {{ background: {T.BG_CARD}; border: 1px solid {T.BORDER}; "
+            f"border-radius: 8px; }}"
         )
-        self.setMinimumHeight(70)
+        self.setMinimumHeight(60)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(10)
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(checked)
@@ -67,15 +56,30 @@ class _ToolCard(QFrame):
         layout.addWidget(self.checkbox)
 
         info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+        title_row = QHBoxLayout()
+        title_row.setSpacing(6)
         name_lbl = QLabel(tool.name)
-        name_lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
-        name_lbl.setStyleSheet("color: #212121;")
-        info_layout.addWidget(name_lbl)
+        name_lbl.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        name_lbl.setStyleSheet(f"color: {T.TEXT_PRIMARY}; background: transparent;")
+        title_row.addWidget(name_lbl)
+        if tool.requires_website:
+            badge = QLabel("WEB ONLY")
+            badge.setStyleSheet(
+                f"color: {T.INFO}; background: {T.INFO_BG}; border-radius: 4px; "
+                "padding: 2px 6px; font-size: 9px; font-weight: bold;"
+            )
+            title_row.addWidget(badge)
+        title_row.addStretch()
+        info_layout.addLayout(title_row)
 
-        desc_lbl = QLabel(tool.description)
+        desc_text = tool.description
+        if tool.requires_website:
+            desc_text += "  Requires a website URL."
         if tool.name in DANGEROUS_TOOL_NAMES:
-            desc_lbl.setText(f"{tool.description}\nAuthorization required. Use only on approved targets.")
-        desc_lbl.setStyleSheet("color: #616161; font-size: 11px;")
+            desc_text += "  ⚠ Authorization required."
+        desc_lbl = QLabel(desc_text)
+        desc_lbl.setStyleSheet(f"color: {T.TEXT_MUTED}; font-size: 10px; background: transparent;")
         desc_lbl.setWordWrap(True)
         info_layout.addWidget(desc_lbl)
         layout.addLayout(info_layout, stretch=1)
@@ -85,25 +89,22 @@ class _ToolCard(QFrame):
 
         self.info_btn = QPushButton("How to install")
         self.info_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.info_btn.setStyleSheet(
-            "QPushButton { color: #1565c0; background: transparent; "
-            "border: 1px solid #1565c0; border-radius: 4px; padding: 4px 10px; "
-            "font-size: 11px; }"
-            "QPushButton:hover { background: #e3f2fd; }"
-        )
+        self.info_btn.setStyleSheet(T.outline_btn_style(T.INFO, T.INFO_BG))
         self.info_btn.clicked.connect(self._show_install_instructions)
         layout.addWidget(self.info_btn)
 
         self.refresh_status()
 
     def refresh_status(self):
-        """Refresh installed / missing status visuals."""
         installed = self.tool.is_installed()
         if not self._applicable:
-            self.status_lbl.setText("Not Applicable")
+            label = self._blocked_reason or "N/A"
+            tone = T.INFO if self._blocked_reason else T.TEXT_MUTED
+            background = T.INFO_BG if self._blocked_reason else T.BG_SURFACE
+            self.status_lbl.setText(label)
             self.status_lbl.setStyleSheet(
-                "color: #888; background: #eee; border-radius: 4px; "
-                "padding: 4px 10px; font-size: 11px; font-weight: bold;"
+                f"color: {tone}; background: {background}; border-radius: 4px; "
+                f"padding: 3px 8px; font-size: 10px; font-weight: bold;"
             )
             self.checkbox.setEnabled(False)
             self.info_btn.setVisible(False)
@@ -111,17 +112,17 @@ class _ToolCard(QFrame):
 
         self.checkbox.setEnabled(True)
         if installed:
-            self.status_lbl.setText("Installed")
+            self.status_lbl.setText("✓ Installed")
             self.status_lbl.setStyleSheet(
-                "color: #2e7d32; background: #e8f5e9; border-radius: 4px; "
-                "padding: 4px 10px; font-size: 11px; font-weight: bold;"
+                f"color: {T.SUCCESS}; background: {T.SUCCESS_BG}; border-radius: 4px; "
+                f"padding: 3px 8px; font-size: 10px; font-weight: bold;"
             )
             self.info_btn.setVisible(False)
         else:
-            self.status_lbl.setText("Missing")
+            self.status_lbl.setText("✗ Missing")
             self.status_lbl.setStyleSheet(
-                "color: #c62828; background: #ffebee; border-radius: 4px; "
-                "padding: 4px 10px; font-size: 11px; font-weight: bold;"
+                f"color: {T.DANGER}; background: {T.DANGER_BG}; border-radius: 4px; "
+                f"padding: 3px 8px; font-size: 10px; font-weight: bold;"
             )
             self.info_btn.setVisible(True)
 
@@ -131,13 +132,7 @@ class _ToolCard(QFrame):
         box.setIcon(QMessageBox.Icon.Information)
         box.setText(self.tool.install_instructions())
         box.addButton("Close", QMessageBox.ButtonRole.AcceptRole)
-        box.setStyleSheet(
-            "QMessageBox { background: #ffffff; }"
-            "QLabel { color: #111111; }"
-            "QPushButton { min-width: 80px; color: #111111; background: #f3f6f9; "
-            "border: 1px solid #90a4ae; border-radius: 4px; padding: 4px 12px; }"
-            "QPushButton:hover { background: #e3f2fd; border-color: #64b5f6; }"
-        )
+        box.setStyleSheet(T.DIALOG_STYLE)
         box.exec()
 
 
@@ -164,104 +159,98 @@ class ToolsPage(QWidget):
 
     def _setup_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 24, 24, 24)
-        root.setSpacing(16)
+        root.setContentsMargins(28, 22, 28, 16)
+        root.setSpacing(12)
 
         header = QLabel("Available Scanners")
         header.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
-        header.setStyleSheet("color: #1a237e;")
+        header.setStyleSheet(f"color: {T.TEXT_PRIMARY};")
         root.addWidget(header)
 
         subtitle = QLabel(
-            "Enable scanners to run. Active web and network scanners require explicit authorization."
+            "Enable scanners to run. WEB ONLY scanners need a website URL. "
+            "Active web and network scanners require explicit authorization."
         )
         subtitle.setWordWrap(True)
-        subtitle.setStyleSheet("color: #555; font-size: 13px;")
+        subtitle.setStyleSheet(f"color: {T.TEXT_MUTED}; font-size: 12px;")
         root.addWidget(subtitle)
 
+        # Mode row
         mode_row = QHBoxLayout()
-        mode_row.addWidget(QLabel("Scan Mode:"))
+        mode_lbl = QLabel("Scan Mode:")
+        mode_lbl.setStyleSheet(f"color: {T.TEXT_SECONDARY}; font-weight: 600;")
+        mode_row.addWidget(mode_lbl)
         self._mode_combo = QComboBox()
         for pname, profile in PROFILES.items():
             self._mode_combo.addItem(
-                f"{pname.value} - {profile.description}",
-                pname.value,
+                f"{pname.value} — {profile.description}", pname.value,
             )
-        self._mode_combo.addItem("Custom - manually selected tools", "custom")
+        self._mode_combo.addItem("Custom — manually selected tools", "custom")
         self._mode_combo.setCurrentIndex(self._mode_combo.findData(self._current_mode_key))
-        self._mode_combo.setMinimumWidth(360)
-        self._mode_combo.setMinimumHeight(34)
+        self._mode_combo.setMinimumWidth(340)
+        self._mode_combo.setMinimumHeight(32)
+        self._mode_combo.setStyleSheet(T.COMBO_STYLE)
         self._mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self._mode_combo)
         mode_row.addStretch()
         root.addLayout(mode_row)
 
+        # Status label
         self._install_status_lbl = QLabel("Waiting for install action.")
         self._install_status_lbl.setWordWrap(True)
         root.addWidget(self._install_status_lbl)
         self._set_status("Waiting for install action.", tone="info")
 
+        # Install progress
         self._install_progress = QProgressBar()
         self._install_progress.setRange(0, 100)
         self._install_progress.setValue(0)
         self._install_progress.setVisible(False)
-        self._install_progress.setStyleSheet(
-            "QProgressBar { border: 1px solid #90caf9; border-radius: 6px; "
-            "text-align: center; background: #e3f2fd; color: #0d47a1; font-weight: bold; }"
-            "QProgressBar::chunk { background: #1976d2; border-radius: 5px; }"
-        )
+        self._install_progress.setMinimumHeight(22)
+        self._install_progress.setStyleSheet(T.PROGRESS_STYLE)
         root.addWidget(self._install_progress)
 
+        # Tool cards scroll
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet(T.SCROLL_STYLE)
+        scroll.viewport().setStyleSheet(f"background: {T.BG_DARK};")
 
         self._cards_container = QWidget()
+        self._cards_container.setStyleSheet(f"background: {T.BG_DARK};")
         self._cards_layout = QVBoxLayout(self._cards_container)
-        self._cards_layout.setSpacing(8)
+        self._cards_layout.setSpacing(6)
         self._cards_layout.addStretch()
         scroll.setWidget(self._cards_container)
         root.addWidget(scroll, stretch=1)
 
+        # Bottom button row
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
         self._install_btn = QPushButton("Install Missing Tools")
         self._install_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._install_btn.setStyleSheet(
-            "QPushButton { border: 1px solid #1565c0; color: #1565c0; "
-            "background: #ffffff; border-radius: 6px; padding: 8px 16px; font-weight: bold; }"
-            "QPushButton:hover { background: #e3f2fd; }"
-            "QPushButton:disabled { color: #455a64; background: #eceff1; border-color: #b0bec5; }"
-        )
+        self._install_btn.setStyleSheet(T.outline_btn_style(T.INFO, T.INFO_BG))
         self._install_btn.clicked.connect(self._on_install_missing)
         btn_row.addWidget(self._install_btn)
 
         self._select_all_btn = QPushButton("Select All Installed")
         self._select_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._select_all_btn.setStyleSheet(
-            "QPushButton { border: 1px solid #1a237e; color: #1a237e; "
-            "border-radius: 6px; padding: 8px 16px; font-weight: bold; }"
-            "QPushButton:hover { background: #e8eaf6; }"
-        )
+        self._select_all_btn.setStyleSheet(T.outline_btn_style(T.ACCENT, T.ACCENT_BG))
         self._select_all_btn.clicked.connect(self._select_all_installed)
         btn_row.addWidget(self._select_all_btn)
 
         self._deselect_all_btn = QPushButton("Deselect All")
         self._deselect_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._deselect_all_btn.setStyleSheet(self._select_all_btn.styleSheet())
+        self._deselect_all_btn.setStyleSheet(T.outline_btn_style(T.TEXT_MUTED, T.BG_HOVER))
         self._deselect_all_btn.clicked.connect(self._deselect_all)
         btn_row.addWidget(self._deselect_all_btn)
 
-        self._run_btn = QPushButton("Run Scan  ->")
-        self._run_btn.setMinimumHeight(44)
+        self._run_btn = QPushButton("Run Scan  →")
+        self._run_btn.setMinimumHeight(40)
         self._run_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._run_btn.setStyleSheet(
-            "QPushButton { background: #2e7d32; color: white; border-radius: 8px; "
-            "padding: 8px 24px; font-size: 14px; font-weight: bold; }"
-            "QPushButton:hover { background: #388e3c; }"
-            "QPushButton:disabled { background: #9e9e9e; }"
-        )
+        self._run_btn.setStyleSheet(T.btn_style(T.SUCCESS_HOVER, T.SUCCESS))
         self._run_btn.clicked.connect(self._on_run)
         btn_row.addWidget(self._run_btn)
 
@@ -278,11 +267,9 @@ class ToolsPage(QWidget):
             self.populate(self._project_info)
 
     def populate(self, project_info: ProjectInfo):
-        """Rebuild tool cards based on the detected project."""
         self._project_info = project_info
         checked_by_name = {
-            card.tool.name: card.checkbox.isChecked()
-            for card in self._cards
+            card.tool.name: card.checkbox.isChecked() for card in self._cards
         }
 
         for card in self._cards:
@@ -292,12 +279,14 @@ class ToolsPage(QWidget):
 
         for tool in ALL_TOOLS:
             applicable = tool.is_applicable(project_info.path)
-            if tool.name in _URL_REQUIRED_TOOLS:
-                applicable = bool(project_info.website_url)
+            blocked_reason = ""
+            if tool.requires_website and not project_info.website_url:
+                applicable = False
+                blocked_reason = "Web only"
 
             default_checked = applicable and tool.is_installed()
             checked = checked_by_name.get(tool.name, default_checked)
-            card = _ToolCard(tool, applicable, checked)
+            card = _ToolCard(tool, applicable, checked, blocked_reason=blocked_reason)
             card.checkbox.stateChanged.connect(self._update_install_button_state)
             card.checkbox.stateChanged.connect(self._on_manual_tool_selection_changed)
             self._cards.append(card)
@@ -307,16 +296,13 @@ class ToolsPage(QWidget):
             self._restore_manual_selection(checked_by_name)
         else:
             self._apply_mode_selection(self._mode_combo.currentData() or self._current_mode_key)
-
         self._update_install_button_state()
 
     def get_selected_tools(self) -> List[ToolBase]:
-        """Return tools that are checked and installed."""
-        selected = []
-        for card in self._cards:
-            if card.checkbox.isChecked() and card.tool.is_installed():
-                selected.append(card.tool)
-        return selected
+        return [
+            card.tool for card in self._cards
+            if card.checkbox.isChecked() and card.tool.is_installed()
+        ]
 
     def _select_all_installed(self):
         for card in self._cards:
@@ -451,12 +437,10 @@ class ToolsPage(QWidget):
             card.checkbox.setEnabled(enabled and card._applicable)
 
     def _missing_count(self) -> int:
-        return len(
-            [
-                card for card in self._cards
-                if card._applicable and not card.tool.is_installed()
-            ]
-        )
+        return len([
+            card for card in self._cards
+            if card._applicable and not card.tool.is_installed()
+        ])
 
     def _update_install_button_state(self, *_):
         if self._installer.is_running:
@@ -482,7 +466,6 @@ class ToolsPage(QWidget):
     def _apply_mode_selection(self, mode_key: str):
         if mode_key == "custom":
             return
-
         profile = next(
             (profile for pname, profile in PROFILES.items() if pname.value == mode_key),
             None,
@@ -549,16 +532,16 @@ class ToolsPage(QWidget):
     def _set_status(self, text: str, tone: str = "info"):
         styles = {
             "info": (
-                "QLabel { color: #0d47a1; background: #e3f2fd; border: 1px solid #90caf9; "
-                "border-radius: 6px; padding: 6px 10px; }"
+                f"QLabel {{ color: {T.INFO}; background: {T.INFO_BG}; "
+                f"border: 1px solid {T.INFO}40; border-radius: 6px; padding: 6px 10px; }}"
             ),
             "success": (
-                "QLabel { color: #1b5e20; background: #e8f5e9; border: 1px solid #a5d6a7; "
-                "border-radius: 6px; padding: 6px 10px; }"
+                f"QLabel {{ color: {T.SUCCESS}; background: {T.SUCCESS_BG}; "
+                f"border: 1px solid {T.SUCCESS}40; border-radius: 6px; padding: 6px 10px; }}"
             ),
             "warn": (
-                "QLabel { color: #b71c1c; background: #ffebee; border: 1px solid #ef9a9a; "
-                "border-radius: 6px; padding: 6px 10px; }"
+                f"QLabel {{ color: {T.DANGER}; background: {T.DANGER_BG}; "
+                f"border: 1px solid {T.DANGER}40; border-radius: 6px; padding: 6px 10px; }}"
             ),
         }
         self._install_status_lbl.setStyleSheet(styles.get(tone, styles["info"]))
@@ -570,13 +553,7 @@ class ToolsPage(QWidget):
         box.setIcon(icon)
         box.setText(text)
         box.addButton("Close", QMessageBox.ButtonRole.AcceptRole)
-        box.setStyleSheet(
-            "QMessageBox { background: #ffffff; }"
-            "QLabel { color: #111111; }"
-            "QPushButton { min-width: 80px; color: #111111; background: #f3f6f9; "
-            "border: 1px solid #90a4ae; border-radius: 4px; padding: 4px 12px; }"
-            "QPushButton:hover { background: #e3f2fd; border-color: #64b5f6; }"
-        )
+        box.setStyleSheet(T.DIALOG_STYLE)
         box.exec()
 
     def _ask_yes_no(self, title: str, text: str) -> QMessageBox.StandardButton:
@@ -587,13 +564,7 @@ class ToolsPage(QWidget):
         yes_btn = box.addButton("Yes", QMessageBox.ButtonRole.YesRole)
         no_btn = box.addButton("No", QMessageBox.ButtonRole.NoRole)
         box.setDefaultButton(yes_btn)
-        box.setStyleSheet(
-            "QMessageBox { background: #ffffff; }"
-            "QLabel { color: #111111; }"
-            "QPushButton { min-width: 80px; color: #111111; background: #f3f6f9; "
-            "border: 1px solid #90a4ae; border-radius: 4px; padding: 4px 12px; }"
-            "QPushButton:hover { background: #e3f2fd; border-color: #64b5f6; }"
-        )
+        box.setStyleSheet(T.DIALOG_STYLE)
         box.exec()
         if box.clickedButton() == yes_btn:
             return QMessageBox.StandardButton.Yes
@@ -624,15 +595,13 @@ class ToolsPage(QWidget):
                 ]
                 if assessment.warning:
                     lines.extend(["", assessment.warning])
-                lines.extend(
-                    [
-                        "",
-                        "Dangerous scanners:",
-                        *[f"- {name}" for name in dangerous],
-                        "",
-                        "Continue only if you own the target or have written permission to test it.",
-                    ]
-                )
+                lines.extend([
+                    "",
+                    "Dangerous scanners:",
+                    *[f"- {name}" for name in dangerous],
+                    "",
+                    "Continue only if you own the target or have written permission to test it.",
+                ])
                 answer = self._ask_yes_no("Authorization Required", "\n".join(lines))
                 if answer != QMessageBox.StandardButton.Yes:
                     return

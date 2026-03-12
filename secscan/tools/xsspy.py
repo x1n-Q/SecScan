@@ -15,6 +15,7 @@ class XssPyTool(ToolBase):
     name = "XssPy"
     description = "Reflected XSS probe checks (pure Python)"
     cli_command = ""
+    requires_website = True
 
     def is_applicable(self, project_path: str) -> bool:
         # XssPy is applicable to projects with a website URL

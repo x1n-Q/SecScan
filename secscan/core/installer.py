@@ -6,6 +6,7 @@ import subprocess
 from typing import Optional
 
 from PySide6.QtCore import QObject, QThread, Signal
+from secscan.tools.base import ToolBase
 
 
 class InstallWorker(QObject):
@@ -55,12 +56,18 @@ class InstallWorker(QObject):
                 if self._stopped:
                     break
 
-                cmd_text = " ".join(args)
+                run_args = list(args)
+                if run_args:
+                    resolved = ToolBase._resolve_executable(run_args[0])
+                    if resolved:
+                        run_args[0] = resolved
+
+                cmd_text = " ".join(run_args)
                 self.log.emit(f"Installing {tool.name}: {cmd_text}")
 
                 try:
                     proc = subprocess.run(
-                        args,
+                        run_args,
                         capture_output=True,
                         text=True,
                         timeout=1800,
@@ -70,7 +77,8 @@ class InstallWorker(QObject):
                     self.log.emit(f"Failed to run installer for {tool.name}: {exc}")
                     continue
 
-                if proc.returncode == 0 and tool.is_installed():
+                tool_detected = tool.is_installed()
+                if proc.returncode == 0 and tool_detected:
                     installed = True
                     summary["installed"].append(tool.name)
                     self.log.emit(f"Installed {tool.name}.")
@@ -84,6 +92,11 @@ class InstallWorker(QObject):
                     last_error = stdout.splitlines()[-1]
                 else:
                     last_error = f"Command exited with code {proc.returncode}."
+                if proc.returncode == 0 and not tool_detected:
+                    last_error = (
+                        "Installer completed, but the executable was not detected. "
+                        "Restart SecScan or add the tool's bin directory to PATH."
+                    )
 
             if not installed and not self._stopped:
                 summary["failed"].append((tool.name, last_error))

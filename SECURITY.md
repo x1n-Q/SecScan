@@ -68,6 +68,10 @@ Never commit:
 - scan targets that are confidential
 - raw reports containing customer secrets
 
+For public branches and releases, sample or demo content must use obviously synthetic placeholders. Do not commit provider-shaped tokens such as AWS keys, GitHub PATs, Stripe keys, session cookies, or private-key blocks, even when they are meant as fake examples.
+
+If you need positive local secret-scanner findings for testing, keep that detector bait in ignored files such as `.env.local` and do not push it.
+
 ### Gitleaks Scanner Safety
 
 This repository includes Gitleaks, a secrets scanner that detects accidentally committed credentials.

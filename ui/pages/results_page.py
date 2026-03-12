@@ -1,4 +1,4 @@
-"""Results page – Summary / Full Log toggle, compact banner, filterable table, export."""
+"""Results page – dark-themed summary banner, findings table, full log toggle, export."""
 
 from __future__ import annotations
 
@@ -21,10 +21,10 @@ from secscan.core.report_html import export_html
 from secscan.core.security_score import calculate_score_from_result, ScoreResult
 from secscan.core.history import compute_trend, TrendMetrics
 from ui.widgets.finding_table import FindingTable
+from ui import theme as T
 
 
 def _esc(text: str) -> str:
-    """Escape HTML entities in text."""
     return _html_mod.escape(str(text))
 
 
@@ -33,14 +33,14 @@ def _esc(text: str) -> str:
 # ------------------------------------------------------------------ #
 
 class _MiniCard(QFrame):
-    """Compact severity count chip."""
+    """Compact severity count chip – dark themed."""
 
     def __init__(self, label: str, color: str, text_color: str = "#fff", parent=None):
         super().__init__(parent)
-        self.setFixedHeight(52)
+        self.setFixedHeight(50)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setStyleSheet(
-            f"_MiniCard {{ background: {color}; border-radius: 10px; border: none; }}"
+            f"_MiniCard {{ background: {color}; border-radius: 8px; border: none; }}"
         )
 
         lay = QHBoxLayout(self)
@@ -54,15 +54,15 @@ class _MiniCard(QFrame):
 
         self._count_lbl = QLabel("0")
         self._count_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._count_lbl.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        self._count_lbl.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         self._count_lbl.setStyleSheet(f"color: {text_color}; background: transparent;")
         inner.addWidget(self._count_lbl)
 
         name_lbl = QLabel(label)
         name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         name_lbl.setStyleSheet(
-            f"color: {text_color}; font-size: 10px; font-weight: 700;"
-            f" background: transparent;"
+            f"color: {text_color}; font-size: 9px; font-weight: 700; "
+            f"background: transparent; text-transform: uppercase;"
         )
         inner.addWidget(name_lbl)
         lay.addLayout(inner)
@@ -72,13 +72,13 @@ class _MiniCard(QFrame):
 
 
 class _ScoreRing(QWidget):
-    """Circular arc widget that paints a score."""
+    """Circular score arc – dark background."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(56, 56)
+        self.setFixedSize(52, 52)
         self._score = 0
-        self._ring_color = QColor("#9e9e9e")
+        self._ring_color = QColor(T.TEXT_MUTED)
 
     def set_data(self, score: int, color: QColor):
         self._score = score
@@ -90,7 +90,7 @@ class _ScoreRing(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = self.rect().adjusted(4, 4, -4, -4)
 
-        track_pen = QPen(QColor("#e0e4ed"), 5)
+        track_pen = QPen(QColor(T.BORDER_SUBTLE), 5)
         track_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(track_pen)
         painter.drawArc(rect, 0, 360 * 16)
@@ -101,87 +101,82 @@ class _ScoreRing(QWidget):
         span = int((self._score / 100.0) * 360 * 16)
         painter.drawArc(rect, 90 * 16, -span)
 
-        painter.setPen(QPen(QColor("#212121")))
-        painter.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        painter.setPen(QPen(QColor(T.TEXT_PRIMARY)))
+        painter.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter,
                          str(self._score) if self._score else "-")
         painter.end()
 
 
 class _SummaryBanner(QFrame):
-    """Single-row banner: Score ring + Grade + trend + severity mini-cards."""
+    """Dark gradient banner: Score + Grade + Trend + severity chips."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("summaryBanner")
-        self.setFixedHeight(80)
+        self.setFixedHeight(76)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setStyleSheet(
             "#summaryBanner {"
-            "  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
-            "    stop:0 #f8f9ff, stop:1 #eef1fb);"
-            "  border: 1px solid #d0d7e4;"
-            "  border-radius: 12px;"
+            f"  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
+            f"    stop:0 {T.BG_CARD}, stop:1 {T.BG_CARD_ALT});"
+            f"  border: 1px solid {T.BORDER};"
+            f"  border-radius: 10px;"
             "}"
         )
 
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(16)
-        shadow.setOffset(0, 3)
-        shadow.setColor(QColor(0, 0, 0, 28))
+        shadow.setBlurRadius(20)
+        shadow.setOffset(0, 4)
+        shadow.setColor(QColor(0, 0, 0, 80))
         self.setGraphicsEffect(shadow)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 6, 12, 6)
-        layout.setSpacing(10)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(8)
 
-        # Score ring
         self._score_ring = _ScoreRing()
         layout.addWidget(self._score_ring)
 
-        # Grade badge
         self._grade_lbl = QLabel("-")
         self._grade_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._grade_lbl.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
-        self._grade_lbl.setFixedSize(44, 44)
+        self._grade_lbl.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        self._grade_lbl.setFixedSize(40, 40)
         self._grade_lbl.setStyleSheet(
-            "color: #fff; background: #9e9e9e; border-radius: 10px;"
+            f"color: #fff; background: {T.TEXT_MUTED}; border-radius: 8px;"
         )
         layout.addWidget(self._grade_lbl)
 
-        # Trend text
         trend_col = QVBoxLayout()
         trend_col.setSpacing(1)
         trend_col.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self._trend_lbl = QLabel("No history yet")
         self._trend_lbl.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold))
-        self._trend_lbl.setStyleSheet("color: #37474f; background: transparent;")
+        self._trend_lbl.setStyleSheet(f"color: {T.TEXT_PRIMARY}; background: transparent;")
         self._trend_lbl.setWordWrap(True)
         trend_col.addWidget(self._trend_lbl)
 
         self._trend_detail = QLabel("")
         self._trend_detail.setStyleSheet(
-            "color: #78909c; font-size: 10px; background: transparent;"
+            f"color: {T.TEXT_MUTED}; font-size: 10px; background: transparent;"
         )
         self._trend_detail.setWordWrap(True)
         trend_col.addWidget(self._trend_detail)
 
         layout.addLayout(trend_col, stretch=0)
 
-        # Separator
         sep = QFrame()
         sep.setFixedWidth(1)
-        sep.setStyleSheet("background: #c5cdd8; border: none; max-width: 1px;")
+        sep.setStyleSheet(f"background: {T.BORDER_SUBTLE}; border: none; max-width: 1px;")
         sep.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         layout.addWidget(sep)
 
-        # Severity mini-cards
-        self._card_critical = _MiniCard("Critical", "#c62828")
-        self._card_high = _MiniCard("High", "#e65100")
-        self._card_medium = _MiniCard("Medium", "#f9a825", "#3e2723")
-        self._card_low = _MiniCard("Low", "#1565c0")
-        self._card_info = _MiniCard("Info", "#546e7a")
+        self._card_critical = _MiniCard("Critical", T.SEV_CRITICAL_BG, T.SEV_CRITICAL)
+        self._card_high = _MiniCard("High", T.SEV_HIGH_BG, T.SEV_HIGH)
+        self._card_medium = _MiniCard("Medium", T.SEV_MEDIUM_BG, T.SEV_MEDIUM)
+        self._card_low = _MiniCard("Low", T.SEV_LOW_BG, T.SEV_LOW)
+        self._card_info = _MiniCard("Info", T.SEV_INFO_BG, T.SEV_INFO)
 
         for card in (self._card_critical, self._card_high, self._card_medium,
                      self._card_low, self._card_info):
@@ -192,18 +187,18 @@ class _SummaryBanner(QFrame):
         self._grade_lbl.setText(grade)
 
         grade_colors = {
-            "A": "#2e7d32", "B": "#558b2f", "C": "#f9a825",
-            "D": "#f57c00", "F": "#c62828",
+            "A": T.SUCCESS, "B": "#22d3ee", "C": T.WARNING,
+            "D": "#fb923c", "F": T.DANGER,
         }
-        bg = grade_colors.get(grade, "#9e9e9e")
-        text_col = "#fff" if grade != "C" else "#212121"
+        bg = grade_colors.get(grade, T.TEXT_MUTED)
+        text_col = "#fff" if grade != "C" else T.BG_DARKEST
         self._grade_lbl.setStyleSheet(
-            f"color: {text_col}; background: {bg}; border-radius: 10px;"
+            f"color: {text_col}; background: {bg}; border-radius: 8px;"
         )
 
-        ring_color = (QColor("#2e7d32") if score_result.score >= 80
-                      else QColor("#f57c00") if score_result.score >= 60
-                      else QColor("#c62828"))
+        ring_color = (QColor(T.SUCCESS) if score_result.score >= 80
+                      else QColor(T.WARNING) if score_result.score >= 60
+                      else QColor(T.DANGER))
         self._score_ring.set_data(score_result.score, ring_color)
 
     def set_trend(self, trend: TrendMetrics):
@@ -213,9 +208,9 @@ class _SummaryBanner(QFrame):
             return
 
         arrows = {"improving": "▲", "declining": "▼", "stable": "●"}
-        colors = {"improving": "#2e7d32", "declining": "#c62828", "stable": "#546e7a"}
+        colors = {"improving": T.SUCCESS, "declining": T.DANGER, "stable": T.TEXT_MUTED}
         arrow = arrows.get(trend.trend_direction, "●")
-        color = colors.get(trend.trend_direction, "#546e7a")
+        color = colors.get(trend.trend_direction, T.TEXT_MUTED)
 
         delta_sign = "+" if trend.score_delta >= 0 else ""
         self._trend_lbl.setText(
@@ -241,33 +236,23 @@ class _SummaryBanner(QFrame):
 
 
 # ------------------------------------------------------------------ #
-# Full Log Viewer (read-only, styled like the run page LogView)
+# Full Log Viewer
 # ------------------------------------------------------------------ #
 
 class _FullLogView(QTextEdit):
-    """Read-only terminal-style log viewer for the full scan output."""
+    """Read-only terminal-style log viewer."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
         self.setFont(QFont("Consolas", 10))
-        self.setStyleSheet(
-            "QTextEdit {"
-            "  background-color: #1e1e2e;"
-            "  color: #cdd6f4;"
-            "  border: 1px solid #45475a;"
-            "  border-radius: 8px;"
-            "  padding: 10px;"
-            "}"
-        )
+        self.setStyleSheet(T.LOG_STYLE)
         self.setPlaceholderText("No scan logs available yet.")
 
     def set_logs(self, logs: list[str]):
-        """Populate with log lines."""
         self.clear()
         if not logs:
             return
-        # Build all HTML at once to avoid per-line cursor overhead
         parts: list[str] = []
         for line in logs:
             color = self._color_for_line(line)
@@ -282,26 +267,25 @@ class _FullLogView(QTextEdit):
 
     @staticmethod
     def _color_for_line(line: str) -> str:
-        """Determine color based on prefix."""
         if line.startswith("[run]"):
-            return "#89b4fa"  # blue
+            return "#89b4fa"
         if line.startswith("[ok]"):
-            return "#a6e3a1"  # green
+            return "#a6e3a1"
         if line.startswith("[error]") or line.startswith("[warn]"):
-            return "#f38ba8"  # red
+            return "#f38ba8"
         if line.startswith("[score]"):
-            return "#f9e2af"  # yellow
+            return "#f9e2af"
         if line.startswith("[full-log]"):
-            return "#94e2d5"  # teal
+            return "#94e2d5"
         if line.startswith("[enrich]") or line.startswith("[history]"):
-            return "#b4befe"  # lavender
+            return "#b4befe"
         if line.startswith("[ignore]"):
-            return "#fab387"  # peach
+            return "#fab387"
         if line.startswith("[cmd]"):
-            return "#74c7ec"  # sapphire
+            return "#74c7ec"
         if line.startswith("[log-mode]"):
-            return "#cba6f7"  # mauve
-        return "#cdd6f4"  # default
+            return "#cba6f7"
+        return "#cdd6f4"
 
 
 # ------------------------------------------------------------------ #
@@ -309,7 +293,7 @@ class _FullLogView(QTextEdit):
 # ------------------------------------------------------------------ #
 
 class ResultsPage(QWidget):
-    """Fourth page: summary banner + findings table / full log toggle + export."""
+    """Fourth page: summary + findings table / full log toggle + export."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -321,80 +305,67 @@ class ResultsPage(QWidget):
 
     def _setup_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(14, 10, 14, 8)
-        root.setSpacing(6)
+        root.setContentsMargins(16, 12, 16, 10)
+        root.setSpacing(8)
 
-        # --- Header row: title + view toggle + export buttons ---
+        # Header row
         header_row = QHBoxLayout()
         header_row.setSpacing(8)
 
         header = QLabel("Scan Results")
         header.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        header.setStyleSheet("color: #1a237e;")
+        header.setStyleSheet(f"color: {T.TEXT_PRIMARY};")
         header_row.addWidget(header)
-
         header_row.addStretch()
 
-        # View mode toggle button
+        # Toggle buttons
         _TOGGLE_ON = (
-            "QPushButton {"
-            "  background: #e8eaf6; color: #1a237e;"
-            "  border: 2px solid #1a237e; border-radius: 8px;"
-            "  padding: 5px 14px; font-weight: bold; font-size: 11px;"
-            "}"
-            "QPushButton:hover { background: #c5cae9; }"
+            f"QPushButton {{"
+            f"  background: {T.ACCENT_BG}; color: {T.ACCENT_HOVER};"
+            f"  border: 1.5px solid {T.ACCENT}; border-radius: 6px;"
+            f"  padding: 5px 14px; font-weight: bold; font-size: 11px;"
+            f"}}"
+            f"QPushButton:hover {{ background: {T.ACCENT}; color: #fff; }}"
         )
         _TOGGLE_OFF = (
-            "QPushButton {"
-            "  background: transparent; color: #546e7a;"
-            "  border: 1px solid #b0bec5; border-radius: 8px;"
-            "  padding: 5px 14px; font-weight: bold; font-size: 11px;"
-            "}"
-            "QPushButton:hover { background: #eceff1; }"
+            f"QPushButton {{"
+            f"  background: transparent; color: {T.TEXT_MUTED};"
+            f"  border: 1px solid {T.BORDER_SUBTLE}; border-radius: 6px;"
+            f"  padding: 5px 14px; font-weight: bold; font-size: 11px;"
+            f"}}"
+            f"QPushButton:hover {{ background: {T.BG_HOVER}; }}"
         )
 
         self._btn_summary = QPushButton("Summary")
-        self._btn_summary.setMinimumHeight(30)
+        self._btn_summary.setMinimumHeight(28)
         self._btn_summary.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_summary.setStyleSheet(_TOGGLE_ON)
         self._btn_summary.clicked.connect(lambda: self._set_view_mode(True))
         header_row.addWidget(self._btn_summary)
 
         self._btn_full = QPushButton("Full Log")
-        self._btn_full.setMinimumHeight(30)
+        self._btn_full.setMinimumHeight(28)
         self._btn_full.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_full.setStyleSheet(_TOGGLE_OFF)
         self._btn_full.clicked.connect(lambda: self._set_view_mode(False))
         header_row.addWidget(self._btn_full)
 
-        # Save references to toggle styles
         self._toggle_on_style = _TOGGLE_ON
         self._toggle_off_style = _TOGGLE_OFF
 
-        # Separator
-        sep = QLabel("|")
-        sep.setStyleSheet("color: #b0bec5; font-size: 16px;")
+        sep = QLabel("│")
+        sep.setStyleSheet(f"color: {T.BORDER_SUBTLE}; font-size: 16px;")
         header_row.addWidget(sep)
 
-        # Export + New Scan buttons
-        _BTN = (
-            "QPushButton {{"
-            "  background: {bg}; color: {fg};"
-            "  border: none; border-radius: 8px;"
-            "  padding: 5px 14px; font-weight: bold; font-size: 11px;"
-            "}}"
-            "QPushButton:hover {{ background: {hov}; }}"
-        )
-
         for label, bg, hov, slot in [
-            ("Export JSON", "#1565c0", "#1976d2", self._export_json),
-            ("Export HTML", "#2e7d32", "#388e3c", self._export_html),
-            ("New Scan", "#1a237e", "#283593", None),
+            ("Export JSON", "#0369a1", "#0284c7", self._export_json),
+            ("Export HTML", T.SUCCESS_HOVER, T.SUCCESS, self._export_html),
+            ("New Scan", T.ACCENT, T.ACCENT_HOVER, None),
         ]:
             btn = QPushButton(label)
-            btn.setMinimumHeight(30)
+            btn.setMinimumHeight(28)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setStyleSheet(_BTN.format(bg=bg, fg="white", hov=hov))
+            btn.setStyleSheet(T.btn_style(bg, hov))
             if slot:
                 btn.clicked.connect(slot)
             else:
@@ -406,28 +377,26 @@ class ResultsPage(QWidget):
 
         self._meta_lbl = QLabel("Target: -")
         self._meta_lbl.setWordWrap(True)
-        self._meta_lbl.setStyleSheet("color: #607d8b; font-size: 11px; padding: 0 2px;")
+        self._meta_lbl.setStyleSheet(
+            f"color: {T.TEXT_MUTED}; font-size: 11px; padding: 0 2px;"
+        )
         root.addWidget(self._meta_lbl)
 
-        # --- Summary banner ---
         self._banner = _SummaryBanner()
         root.addWidget(self._banner)
 
-        # --- Stacked widget: 0 = Findings table, 1 = Full log ---
         self._stack = QStackedWidget()
 
         self._table = FindingTable()
-        self._stack.addWidget(self._table)  # index 0
+        self._stack.addWidget(self._table)
 
         self._full_log = _FullLogView()
-        self._stack.addWidget(self._full_log)  # index 1
+        self._stack.addWidget(self._full_log)
 
         self._stack.setCurrentIndex(0)
         root.addWidget(self._stack, stretch=1)
 
-    # ------------------------------------------------------------------ #
     def _set_view_mode(self, summary: bool):
-        """Switch between summary (table) and full log view."""
         self._is_summary_mode = summary
         if summary:
             self._stack.setCurrentIndex(0)
@@ -435,35 +404,27 @@ class ResultsPage(QWidget):
             self._btn_full.setStyleSheet(self._toggle_off_style)
         else:
             self._stack.setCurrentIndex(1)
-            # Always refresh full log when switching to it
             self._full_log.set_logs(self._scan_logs)
             self._btn_full.setStyleSheet(self._toggle_on_style)
             self._btn_summary.setStyleSheet(self._toggle_off_style)
 
-    # ------------------------------------------------------------------ #
-    # Public
-    # ------------------------------------------------------------------ #
     def load_result(self, result: ScanResult, output_dir: str):
-        """Display the scan result with score and trend data."""
         self._result = result
         self._output_dir = output_dir
         started = result.started_at or "N/A"
         finished = result.finished_at or "N/A"
         self._meta_lbl.setText(
-            f"Target: {result.project_path} | Scanned: {started} -> {finished}"
+            f"Target: {result.project_path}  ·  Scanned: {started} → {finished}"
         )
 
-        # Summary counts
         self._banner.set_counts(result.summary)
 
-        # Security score
         try:
             score_result = calculate_score_from_result(result)
             self._banner.set_score(score_result)
         except Exception:
             pass
 
-        # Trend
         try:
             score_result = calculate_score_from_result(result)
             trend = compute_trend(result, score_result, result.project_path)
@@ -471,16 +432,11 @@ class ResultsPage(QWidget):
         except Exception:
             pass
 
-        # Findings table
         self._table.set_findings(result.findings)
-
-        # Reset to summary view
         self._set_view_mode(True)
 
     def set_scan_logs(self, logs: list[str]):
-        """Receive the full scan logs from the run page."""
         self._scan_logs = list(logs)
-        # If currently viewing full log, refresh it
         if not self._is_summary_mode:
             self._full_log.set_logs(self._scan_logs)
 
@@ -488,7 +444,6 @@ class ResultsPage(QWidget):
     def new_scan_button(self) -> QPushButton:
         return self._new_scan_btn
 
-    # ------------------------------------------------------------------ #
     def _export_json(self):
         if not self._result:
             return
@@ -497,8 +452,7 @@ class ResultsPage(QWidget):
             try:
                 path = export_json(self._result, dir_path)
                 QMessageBox.information(
-                    self, "Export Complete",
-                    f"JSON report saved to:\n{path}",
+                    self, "Export Complete", f"JSON report saved to:\n{path}",
                 )
             except Exception as exc:
                 QMessageBox.critical(self, "Export Failed", str(exc))
@@ -511,12 +465,10 @@ class ResultsPage(QWidget):
             try:
                 path = export_html(self._result, dir_path)
                 QMessageBox.information(
-                    self, "Export Complete",
-                    f"HTML report saved to:\n{path}",
+                    self, "Export Complete", f"HTML report saved to:\n{path}",
                 )
                 reply = QMessageBox.question(
-                    self, "Open Report",
-                    "Open the HTML report in your browser?",
+                    self, "Open Report", "Open the HTML report in your browser?",
                 )
                 if reply == QMessageBox.StandardButton.Yes:
                     webbrowser.open(f"file:///{path}")
@@ -524,5 +476,4 @@ class ResultsPage(QWidget):
                 QMessageBox.critical(self, "Export Failed", str(exc))
 
     def _new_scan_requested(self):
-        """Handled by MainWindow via signal wiring."""
         pass
