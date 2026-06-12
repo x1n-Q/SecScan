@@ -1,11 +1,11 @@
-﻿[build-system]
+[build-system]
 requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "secscan"
 version = "1.0.0"
-description = "SecScan - A cross-platform GUI security scanner for software projects"
+description = "A unified Python desktop and CLI security scanner orchestrating dependency auditing, secrets detection, SAST, IaC linting, and web vulnerability analysis."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
